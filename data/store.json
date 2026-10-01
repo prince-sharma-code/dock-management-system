@@ -1,0 +1,182 @@
+{
+  "berths": [
+    {
+      "id": "B1",
+      "name": "Berth 1 — Merry Cove",
+      "type": "Sloop",
+      "emoji": "🛶",
+      "desc": "Protected cove slip for small vessels and caravels"
+    },
+    {
+      "id": "B2",
+      "name": "Berth 2 — Thousand Bay",
+      "type": "Galleon",
+      "emoji": "⛵",
+      "desc": "Mid-sized pier equipped with cola refuel pumps"
+    },
+    {
+      "id": "B3",
+      "name": "Berth 3 — Adam Wood Quay",
+      "type": "Marine Warship",
+      "emoji": "🚢",
+      "desc": "Heavily reinforced slip for iron-clad battleships"
+    },
+    {
+      "id": "B4",
+      "name": "Berth 4 — Paulie's Rigging",
+      "type": "Sloop",
+      "emoji": "🛶",
+      "desc": "Fast turnaround slip with rope cranes"
+    },
+    {
+      "id": "B5",
+      "name": "Berth 5 — Blueno's Wharf",
+      "type": "Galleon",
+      "emoji": "⛵",
+      "desc": "Spacious deep-water mooring pier"
+    },
+    {
+      "id": "B6",
+      "name": "Berth 6 — Franky's Yard",
+      "type": "Marine Warship",
+      "emoji": "🚢",
+      "desc": "Cyborg dock equipped with heavy battle repair cranes"
+    },
+    {
+      "id": "B7",
+      "name": "Berth 7 — Iceburg Inlet",
+      "type": "Sloop",
+      "emoji": "🛶",
+      "desc": "Prime entrance slip near Galley-La headquarters"
+    },
+    {
+      "id": "B8",
+      "name": "Berth 8 — Kokoro's Station",
+      "type": "Galleon",
+      "emoji": "⛵",
+      "desc": "Adjoining the Puffing Tom sea-train canal"
+    },
+    {
+      "id": "B9",
+      "name": "Berth 9 — Robin's Haven",
+      "type": "Sloop",
+      "emoji": "🛶",
+      "desc": "Quiet, secluded berth for discrete arrivals"
+    },
+    {
+      "id": "B10",
+      "name": "Berth 10 — Zoro's Bastion",
+      "type": "Marine Warship",
+      "emoji": "🚢",
+      "desc": "Fortified warship quay with three-blade security"
+    },
+    {
+      "id": "B11",
+      "name": "Berth 11 — Nami's Reach",
+      "type": "Galleon",
+      "emoji": "⛵",
+      "desc": "Clear sightlines for Grand Line log pose navigators"
+    },
+    {
+      "id": "B12",
+      "name": "Berth 12 — Luffy's Launch",
+      "type": "Sloop",
+      "emoji": "🛶",
+      "desc": "Adventure launch point with direct open-sea current"
+    }
+  ],
+  "users": [
+    {
+      "username": "luffy",
+      "name": "Monkey D. Luffy",
+      "email": "luffy@strawhat.sea",
+      "password": "gomugomu",
+      "ship": "Galleon",
+      "score": 100,
+      "role": "user"
+    },
+    {
+      "username": "zoro",
+      "name": "Roronoa Zoro",
+      "email": "zoro@strawhat.sea",
+      "password": "santoryu",
+      "ship": "Sloop",
+      "score": 95,
+      "role": "user"
+    },
+    {
+      "username": "law",
+      "name": "Trafalgar Law",
+      "email": "law@heartpirates.sea",
+      "password": "roomshambles",
+      "ship": "Sloop",
+      "score": 98,
+      "role": "user"
+    },
+    {
+      "username": "smoker",
+      "name": "Vice Admiral Smoker",
+      "email": "smoker@marine.gov",
+      "password": "whiteblow",
+      "ship": "Marine Warship",
+      "score": 75,
+      "role": "user",
+      "noShows": 1
+    },
+    {
+      "username": "iceburg",
+      "name": "Iceburg (Admin)",
+      "email": "iceburg@galleyla.co",
+      "password": "galleyla2024",
+      "ship": "Galleon",
+      "score": 100,
+      "role": "admin"
+    }
+  ],
+  "bookings": [
+    {
+      "id": "BK-1001",
+      "userId": "luffy",
+      "captainName": "Monkey D. Luffy",
+      "berthId": "B2",
+      "shipType": "Galleon",
+      "date": "2026-09-28",
+      "timeStart": "09:00",
+      "timeEnd": "12:00",
+      "notes": "Thousand Sunny dock for cola reload",
+      "status": "checked_in",
+      "createdAt": "2026-09-28T00:00:00.000Z"
+    },
+    {
+      "id": "BK-1002",
+      "userId": "smoker",
+      "captainName": "Vice Admiral Smoker",
+      "berthId": "B3",
+      "shipType": "Marine Warship",
+      "date": "2026-09-28",
+      "timeStart": "13:00",
+      "timeEnd": "16:00",
+      "notes": "Marine patrol standby at Adam Wood quay",
+      "status": "no_show",
+      "createdAt": "2026-09-28T00:00:00.000Z"
+    }
+  ],
+  "noShowLog": [
+    {
+      "timestamp": "2026-09-28T09:09:30.972Z",
+      "username": "smoker",
+      "berthId": "B3",
+      "type": "Berth No-Show Forfeiture",
+      "impact": "-15 Karma"
+    }
+  ],
+  "fortuneHistory": [],
+  "lastFortune": null,
+  "appSettings": {
+    "audio": {
+      "volume": 0.8
+    },
+    "theme": "water7",
+    "sync": "backend-enabled"
+  }
+}

@@ -1,0 +1,973 @@
+/* ================================================================
+   GALLEY-LA DOCKMASTER — Application Logic v3 (Cinematic + Art)
+   One Piece · Water 7 · Grand Line · Framer-Quality Animations
+   All 10 Core Specs + 3 Bonus Features
+   ================================================================ */
+
+'use strict';
+
+// ─── CONSTANTS ─────────────────────────────────────────────────────
+const ADMIN_CREDS       = { username: 'iceburg', password: 'galleyla2024', name: 'Iceburg' };
+const NO_SHOW_PENALTY   = 15;
+const CANCEL_PENALTY    = 5;
+const CHECKIN_REWARD    = 2;
+const CHECKIN_WIN_MINS  = 30;   // check-in window opens 30 mins before
+const FORFEITURE_MINS   = 15;   // no-show after 15 mins past start
+
+// 12 Berths
+const DEFAULT_BERTHS = [
+  { id:'B1',  name:'Berth 1 — Merry Cove',      type:'Sloop',          emoji:'🛶', desc:'Perfect for small Sloop vessels' },
+  { id:'B2',  name:'Berth 2 — Sunny Bay',        type:'Galleon',        emoji:'⛵', desc:'Ideal for Galleons & caravels' },
+  { id:'B3',  name:'Berth 3 — Galley-La Dock',   type:'Marine Warship', emoji:'🚢', desc:'Marine Warships & heavy cruisers' },
+  { id:'B4',  name:"Berth 4 — Paulie's Slip",    type:'Sloop',          emoji:'🛶', desc:'Classic berth for swift crews' },
+  { id:'B5',  name:"Berth 5 — Blueno's Wharf",   type:'Galleon',        emoji:'⛵', desc:'Spacious mid-size pier' },
+  { id:'B6',  name:"Berth 6 — Franky's Yard",    type:'Marine Warship', emoji:'🚢', desc:'Reinforced for iron-clad ships' },
+  { id:'B7',  name:'Berth 7 — Iceburg Inlet',    type:'Sloop',          emoji:'🛶', desc:'Named after the Galley-La chief' },
+  { id:'B8',  name:"Berth 8 — Kokoro's Point",   type:'Galleon',        emoji:'⛵', desc:'Near the Puffing Tom station' },
+  { id:'B9',  name:"Berth 9 — Robin's Rest",     type:'Sloop',          emoji:'🛶', desc:'Quiet slip for covert arrivals' },
+  { id:'B10', name:"Berth 10 — Zoro's Pier",     type:'Marine Warship', emoji:'🚢', desc:'Heavily secured warship dock' },
+  { id:'B11', name:"Berth 11 — Nami's Reach",    type:'Galleon',        emoji:'⛵', desc:'Clear sight lines for navigation' },
+  { id:'B12', name:"Berth 12 — Luffy's Launch",  type:'Sloop',          emoji:'🛶', desc:'Always ready for adventure!' },
+];
+
+// ─── STATE ─────────────────────────────────────────────────────────
+let currentUser     = null;
+let berths          = [];
+let bookings        = [];
+let users           = [];
+let noShowLog       = [];
+let selectedBerthId = null;
+let countdownIntvl  = null;
+let berthFilter     = 'all';
+let historyFilter   = 'all';
+let particleRAF     = null;
+
+// ─── INIT ───────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadData();
+  initParticles();
+  initCursorGlow();
+  initAuthStars();
+  setTodayMin();
+
+  // Splash out
+  setTimeout(() => {
+    const splash = document.getElementById('splashScreen');
+    splash.style.transition = 'opacity 0.7s ease-out';
+    splash.style.opacity = '0';
+    setTimeout(() => {
+      splash.classList.add('hidden');
+      document.getElementById('authScreen').classList.remove('hidden');
+      checkExistingSession();
+    }, 700);
+  }, 3000);
+
+  // No-show checker every 60s
+  setInterval(checkNoShows, 60000);
+
+  // Animate splash counter
+  let pct = 0;
+  const pctEl = document.getElementById('splashPct');
+  const pctInt = setInterval(()=>{
+    pct += Math.floor(Math.random()*12)+4;
+    if(pct>100)pct=100;
+    if(pctEl) pctEl.textContent = pct+'%';
+    if(pct===100) clearInterval(pctInt);
+  }, 120);
+});
+
+// ─── PARTICLE SYSTEM ────────────────────────────────────────────────
+function initParticles() {
+  const canvas = document.getElementById('particleCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W = window.innerWidth, H = window.innerHeight;
+
+  const resize = () => { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; };
+  window.addEventListener('resize', resize); resize();
+
+  const particles = Array.from({ length: 80 }, () => createParticle(W, H));
+
+  function createParticle(W, H) {
+    const types = ['star','bubble','sparkle'];
+    const t = types[Math.floor(Math.random() * types.length)];
+    return {
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 0.3, vy: -Math.random() * 0.5 - 0.1,
+      r: Math.random() * 2 + 0.5,
+      alpha: Math.random() * 0.6 + 0.1,
+      life: Math.random(),
+      type: t,
+      color: Math.random() > 0.5
+        ? `rgba(6,214,240,` // teal
+        : Math.random() > 0.5
+          ? `rgba(245,197,24,` // gold
+          : `rgba(255,255,255,` // white
+    };
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach((p, i) => {
+      p.x += p.vx; p.y += p.vy;
+      p.life += 0.003;
+      p.alpha = Math.sin(p.life * Math.PI) * 0.5;
+
+      if (p.y < -10 || p.life >= 1) {
+        particles[i] = createParticle(W, H);
+        particles[i].y = H + 5;
+        return;
+      }
+
+      ctx.save();
+      ctx.globalAlpha = p.alpha;
+      if (p.type === 'star') {
+        ctx.fillStyle = p.color + p.alpha + ')';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.type === 'bubble') {
+        ctx.strokeStyle = p.color + p.alpha + ')';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 2, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = p.color + p.alpha + ')';
+        // sparkle: 4 lines
+        for (let j = 0; j < 4; j++) {
+          const angle = (j * Math.PI) / 2;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x + Math.cos(angle) * p.r * 3, p.y + Math.sin(angle) * p.r * 3);
+          ctx.lineWidth = 0.5;
+          ctx.strokeStyle = p.color + p.alpha + ')';
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    });
+    particleRAF = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ─── CURSOR GLOW ───────────────────────────────────────────────────
+function initCursorGlow() {
+  const glow = document.getElementById('cursorGlow');
+  if (!glow) return;
+  let mx = 0, my = 0, cx = 0, cy = 0;
+  document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+  const animate = () => {
+    cx += (mx - cx) * 0.1; cy += (my - cy) * 0.1;
+    glow.style.left = cx + 'px'; glow.style.top = cy + 'px';
+    requestAnimationFrame(animate);
+  };
+  animate();
+}
+
+// ─── AUTH STARS ────────────────────────────────────────────────────
+function initAuthStars() {
+  const container = document.getElementById('authStars');
+  if (!container) return;
+  for (let i = 0; i < 60; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    star.style.cssText = `
+      left:${Math.random()*100}%;
+      top:${Math.random()*70}%;
+      width:${Math.random()*2+1}px;
+      height:${Math.random()*2+1}px;
+      animation-delay:${Math.random()*4}s;
+      animation-duration:${2+Math.random()*3}s;
+      opacity:${Math.random()*0.5+0.1};
+    `;
+    container.appendChild(star);
+  }
+}
+
+// ─── 3D TILT CARDS ─────────────────────────────────────────────────
+function initTiltCards() {
+  document.querySelectorAll('.qa-manga-card, .ch-stat, .ams, .manga-card-panel').forEach(card => {
+    card.addEventListener('mousemove', e => {
+      const rect = card.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = (e.clientX - cx) / (rect.width / 2);
+      const dy = (e.clientY - cy) / (rect.height / 2);
+      card.style.transform = `translateY(-6px) rotateX(${-dy * 6}deg) rotateY(${dx * 6}deg) scale(1.02)`;
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = '';
+      card.style.transition = 'transform 0.5s ease-out';
+      setTimeout(() => card.style.transition = '', 500);
+    });
+    card.style.transformStyle = 'preserve-3d';
+    card.style.transition = 'transform 0.1s linear';
+  });
+  // Parallax auth characters on mouse move
+  document.addEventListener('mousemove', e => {
+    const l = document.getElementById('authCharL');
+    const r = document.getElementById('authCharR');
+    if (!l || !r) return;
+    const dx = (e.clientX / window.innerWidth - 0.5) * 20;
+    const dy = (e.clientY / window.innerHeight - 0.5) * 10;
+    l.style.transform = `translate(${dx * -0.5}px, ${dy * -0.3}px)`;
+    r.style.transform = `translate(${dx * 0.5}px, ${dy * -0.3}px)`;
+  });
+}
+
+// ─── SET TODAY MIN ──────────────────────────────────────────────────
+function setTodayMin() {
+  const t = new Date().toISOString().split('T')[0];
+  const el = document.getElementById('bookDate');
+  if (el) { el.min = t; if (!el.value) el.value = t; }
+}
+
+// ─── DATA PERSISTENCE ───────────────────────────────────────────────
+function loadData() {
+  berths   = JSON.parse(localStorage.getItem('gl_berths')   || 'null') || DEFAULT_BERTHS;
+  bookings = JSON.parse(localStorage.getItem('gl_bookings') || '[]');
+  users    = JSON.parse(localStorage.getItem('gl_users')    || '[]');
+  noShowLog= JSON.parse(localStorage.getItem('gl_noshow')   || '[]');
+}
+function saveData() {
+  localStorage.setItem('gl_berths',   JSON.stringify(berths));
+  localStorage.setItem('gl_bookings', JSON.stringify(bookings));
+  localStorage.setItem('gl_users',    JSON.stringify(users));
+  localStorage.setItem('gl_noshow',   JSON.stringify(noShowLog));
+}
+function checkExistingSession() {
+  const s = localStorage.getItem('gl_session');
+  if (!s) return;
+  const sess = JSON.parse(s);
+  if (sess.role === 'admin') { currentUser = { ...ADMIN_CREDS, role: 'admin' }; enterApp(); }
+  else { const u = users.find(u => u.username === sess.username); if (u) { currentUser = u; enterApp(); } }
+}
+
+// ─── AUTH ───────────────────────────────────────────────────────────
+function showRegister(e) { e && e.preventDefault(); toggle('loginPanel','hidden',true); toggle('registerPanel','hidden',false); animateCard(); }
+function showLogin(e)    { e && e.preventDefault(); toggle('registerPanel','hidden',true); toggle('loginPanel','hidden',false); animateCard(); }
+function toggle(id, cls, val) { document.getElementById(id)?.classList.toggle(cls, val); }
+function animateCard() {
+  const card = document.getElementById('authCard');
+  if (!card) return;
+  card.style.animation = 'none'; card.offsetHeight;
+  card.style.animation = 'cardDrop 0.5s cubic-bezier(0.34,1.56,0.64,1)';
+}
+
+function handleLogin() {
+  const u = document.getElementById('loginUsername').value.trim();
+  const p = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.classList.add('hidden');
+  if (!u || !p) { showAuthErr(errEl, '⚓ Enter your call sign and secret code!'); return; }
+  const user = users.find(x => x.username === u && x.password === p);
+  if (!user) { showAuthErr(errEl, '🏴‍☠️ Wrong credentials! Check your crew manifest.'); return; }
+  currentUser = user;
+  localStorage.setItem('gl_session', JSON.stringify({ username: user.username }));
+  enterApp();
+}
+function handleAdminLogin() {
+  const u = document.getElementById('loginUsername').value.trim();
+  const p = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  if (u === ADMIN_CREDS.username && p === ADMIN_CREDS.password) {
+    currentUser = { ...ADMIN_CREDS, role: 'admin' };
+    localStorage.setItem('gl_session', JSON.stringify({ role: 'admin', username: 'iceburg' }));
+    enterApp();
+  } else { showAuthErr(errEl, '🏛 Incorrect dockmaster credentials!'); }
+}
+function handleRegister() {
+  const name     = document.getElementById('regName').value.trim();
+  const username = document.getElementById('regUsername').value.trim();
+  const email    = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const shipType = document.getElementById('regShipType').value;
+  const errEl    = document.getElementById('regError');
+  errEl.classList.add('hidden');
+  if (!name||!username||!email||!password) { showAuthErr(errEl,'⚓ Fill all fields, Captain!'); return; }
+  if (password.length < 6) { showAuthErr(errEl,'🔒 Secret code must be at least 6 characters!'); return; }
+  if (users.find(u=>u.username===username)) { showAuthErr(errEl,'👤 That call sign is already taken!'); return; }
+  const newUser = {
+    id:'U'+Date.now(), name, username, email, password, shipType,
+    reliabilityScore:100, totalBookings:0, completedBookings:0,
+    cancelledBookings:0, noShows:0, checkIns:0,
+    joinedAt:new Date().toISOString(), role:'user'
+  };
+  users.push(newUser); saveData();
+  currentUser = newUser;
+  localStorage.setItem('gl_session', JSON.stringify({ username }));
+  showToast('success','🎉 Welcome aboard, '+name+'! Your berth account is ready!');
+  setTimeout(() => enterApp(), 600);
+}
+function showAuthErr(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
+function handleLogout() {
+  currentUser = null; localStorage.removeItem('gl_session'); clearInterval(countdownIntvl);
+  document.getElementById('mainApp').classList.add('hidden');
+  document.getElementById('authScreen').classList.remove('hidden');
+  document.getElementById('loginUsername').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginError').classList.add('hidden');
+  showLogin();
+  showToast('info','⚓ Disembarked safely. Fair winds, Captain!');
+}
+
+// ─── ENTER APP ──────────────────────────────────────────────────────
+function enterApp() {
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('mainApp').classList.remove('hidden');
+
+  const isAdmin = currentUser.role === 'admin';
+  ['navAdmin','mNavAdmin'].forEach(id => document.getElementById(id)?.classList.toggle('hidden', !isAdmin));
+
+  const name = currentUser.name || currentUser.username;
+  document.getElementById('navUsername').textContent = name;
+  document.getElementById('navAvatar').textContent   = name[0].toUpperCase();
+
+  checkNoShows();
+  showView('dashboard');
+  setTimeout(() => fireDendenAlert('Welcome to Water 7 Docks, ' + name + '! Your berth awaits!'), 400);
+  setTimeout(() => initTiltCards(), 800);
+}
+
+// ─── VIEW NAVIGATION ────────────────────────────────────────────────
+function showView(viewName) {
+  ['dashboard','book','history','admin'].forEach(v => {
+    const el   = document.getElementById('view'+cap(v));
+    const nb   = document.getElementById('nav'+cap(v));
+    const mb   = document.getElementById('mNav'+cap(v));
+    const active = v === viewName;
+    if (el) { el.classList.toggle('active-view', active); el.classList.toggle('hidden-view', !active); if(active){ el.classList.add('view-enter'); setTimeout(()=>el.classList.remove('view-enter'),500); } }
+    if (nb) nb.classList.toggle('active', active);
+    if (mb) mb.classList.toggle('active', active);
+  });
+  if (viewName==='dashboard') renderDashboard();
+  if (viewName==='book')      renderBookView();
+  if (viewName==='history')   renderHistory();
+  if (viewName==='admin')     renderAdmin();
+  setTimeout(() => initTiltCards(), 300);
+}
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// ─── DASHBOARD ──────────────────────────────────────────────────────
+function renderDashboard() {
+  checkNoShows();
+  const now   = new Date();
+  const h     = now.getHours();
+  const greet = h<12?'Good Morning':h<17?'Good Afternoon':'Good Evening';
+  const name  = currentUser.name || 'Captain';
+
+  const heroEl = document.getElementById('heroGreeting');
+  if (heroEl) heroEl.textContent = greet + ', ' + name + '!';
+
+  const active = bookings.filter(b => isActiveNow(b) && (b.status==='confirmed'||b.status==='checked_in'));
+  setEl('statAvail',  berths.length - active.length);
+  setEl('statBooked', active.length);
+
+  const score = getScore();
+  setEl('myScore', score);
+  updateNavScore();
+  updateScoreCard(score);
+  renderBerthGrid3d();
+  renderActiveCountdown();
+}
+
+function setEl(id, val) { const el = document.getElementById(id); if(el) el.textContent = val; }
+
+function getScore() {
+  if (currentUser.role==='admin') return 100;
+  const u = users.find(u=>u.username===currentUser.username);
+  return u ? (u.reliabilityScore ?? 100) : 100;
+}
+function updateNavScore() { setEl('navScoreMini','⭐ '+getScore()); }
+
+function updateScoreCard(score) {
+  setEl('scoreValue', score);
+  // SVG ring
+  const circ = document.getElementById('scoreProgressCircle');
+  if (circ) {
+    const r = 50; const circumference = 2 * Math.PI * r;
+    const offset = circumference - (score / 100) * circumference;
+    circ.style.strokeDasharray  = circumference;
+    circ.style.strokeDashoffset = offset;
+    const col = score>=75?'#10b981':score>=50?'#fbbf24':'#ef4444';
+    circ.style.stroke = col;
+  }
+  let rank = '⭐ Legendary Captain';
+  if (score>=90) rank = '⭐ Legendary Captain';
+  else if (score>=75) rank = '🌊 Seasoned Sailor';
+  else if (score>=60) rank = '⛵ Reliable Crew';
+  else if (score>=45) rank = '🏴‍☠️ Shaky Pirate';
+  else rank = '💀 Wanted Criminal';
+  setEl('scoreRank', rank);
+
+  const u = currentUser.role!=='admin' ? users.find(u=>u.username===currentUser.username) : null;
+  const el = document.getElementById('scoreBreakdown');
+  if (el && u) {
+    el.innerHTML = [
+      ['✅ Check-ins',     u.checkIns||0],
+      ['❌ Cancellations', u.cancelledBookings||0],
+      ['🚫 No-Shows',      u.noShows||0],
+      ['📋 Total Bookings',u.totalBookings||0],
+    ].map(([l,v])=>`<div class="score-3d-item"><span class="score-3d-item-label">${l}</span><span class="score-3d-item-val">${v}</span></div>`).join('');
+  }
+}
+
+// ─── BERTH GRID 3D ──────────────────────────────────────────────────
+function renderBerthGrid3d() {
+  const grid = document.getElementById('berthGrid');
+  if (!grid) return;
+  const now = new Date();
+  const myId = currentUser.id || currentUser.username;
+
+  let list = berths.filter(b => {
+    if (berthFilter==='available') return getBerthStatus(b.id,now)==='available';
+    if (berthFilter && berthFilter!=='all') return b.type===berthFilter;
+    return true;
+  });
+
+  grid.innerHTML = list.map((b, idx) => {
+    const status = getBerthStatus(b.id, now);
+    const act    = getActiveBerthBooking(b.id, now);
+    const isMine = act && (act.userId===myId);
+    const cls    = isMine ? 'bmc-mine' : `bmc-${status}`;
+    const stLabel= isMine ? 'Your Berth' : status==='checked_in' ? 'Checked In' : status;
+    const stCls  = isMine ? 'st-mine'  : `st-${status}`;
+    return `
+      <div class="bmc ${cls}" style="--i:${idx}" onclick="berthCardClick('${b.id}','${status}')">
+        <span class="bmc-emoji">${b.emoji}</span>
+        <div class="bmc-id">${b.id}</div>
+        <div class="bmc-type">${b.type}</div>
+        <span class="bmc-status ${stCls}">${stLabel}</span>
+        ${act ? `<div class="bmc-occupant">👤 ${act.userName}</div>` : ''}
+        ${act ? `<div class="bmc-time">⏰ ${act.timeStart}–${act.timeEnd}</div>` : ''}
+      </div>`;
+  }).join('');
+  if (!list.length) grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><span class="es-icon">⚓</span><p class="es-text">No berths match this filter, Captain!</p></div>';
+}
+
+function filterBerths(type, btn) {
+  berthFilter = type;
+  document.querySelectorAll('.bf').forEach(b=>b.classList.remove('active'));
+  btn?.classList.add('active');
+  renderBerthGrid3d();
+}
+function berthCardClick(berthId, status) {
+  if (status==='available') { showView('book'); setTimeout(()=>selectBookBerth(berthId), 200); }
+  else showToast('info', `Berth ${berthId} is currently ${status}. Choose a free slip!`);
+}
+
+// ─── STATUS HELPERS ─────────────────────────────────────────────────
+function getBerthStatus(id, now) {
+  const b = getActiveBerthBooking(id, now);
+  if (!b) return 'available';
+  if (b.status==='checked_in') return 'checked_in';
+  return 'occupied';
+}
+function getActiveBerthBooking(berthId, now) {
+  const ms = now.getTime();
+  return bookings.find(b => {
+    if (b.berthId!==berthId) return false;
+    if (b.status!=='confirmed'&&b.status!=='checked_in') return false;
+    const s = new Date(b.date+'T'+b.timeStart).getTime();
+    const e = new Date(b.date+'T'+b.timeEnd).getTime();
+    return ms>=s && ms<e;
+  }) || null;
+}
+function isActiveNow(b) {
+  const now=new Date(), s=new Date(b.date+'T'+b.timeStart), e=new Date(b.date+'T'+b.timeEnd);
+  return now>=s && now<e;
+}
+
+// ─── ACTIVE BOOKING COUNTDOWN ───────────────────────────────────────
+function renderActiveCountdown() {
+  clearInterval(countdownIntvl);
+  const section = document.getElementById('activeBookingSection');
+  if (!section) return;
+  const myId = currentUser.id || currentUser.username;
+  const now  = new Date();
+  const myBook = bookings.find(b => {
+    if (b.userId!==myId) return false;
+    if (b.status!=='confirmed'&&b.status!=='checked_in') return false;
+    const s = new Date(b.date+'T'+b.timeStart);
+    const e = new Date(b.date+'T'+b.timeEnd);
+    return now >= new Date(s-2*60*60*1000) && now < e;
+  });
+  if (!myBook) { section.style.display='none'; return; }
+  section.style.display = 'block';
+
+  function tick() {
+    const card = document.getElementById('activeBookingCard');
+    if (!card) return;
+    const now   = new Date();
+    const start = new Date(myBook.date+'T'+myBook.timeStart);
+    const end   = new Date(myBook.date+'T'+myBook.timeEnd);
+    const forf  = new Date(start.getTime()+FORFEITURE_MINS*60000);
+    const berth = berths.find(b=>b.id===myBook.berthId);
+
+    let target, label, isUrgent=false;
+    if (now < start)      { target=start; label='Until Start'; }
+    else if (myBook.status==='confirmed'&&now<forf) { target=forf; label='⚠️ Until Forfeiture!'; isUrgent=true; }
+    else                  { target=end;   label='Until End'; }
+
+    const diff    = Math.max(0, target-now);
+    const total   = Math.max(1, target - (now<start?new Date(start-2*3600000):start));
+    const pct     = Math.max(0,Math.min(1,1-diff/total));
+    const mins    = Math.floor(diff/60000);
+    const secs    = Math.floor((diff%60000)/1000);
+    const circum  = 2*Math.PI*36;
+    const offset  = circum - pct*circum;
+
+    card.innerHTML = `
+      <div style="position:relative;z-index:1">
+        <div class="ab-berth">${berth?berth.emoji+' '+berth.name:myBook.berthId}</div>
+        <div class="ab-info">${berth?berth.type:''} · ${myBook.date}</div>
+        <div class="ab-time">⏰ ${myBook.timeStart} – ${myBook.timeEnd}</div>
+        <div class="ab-actions">
+          ${myBook.status==='confirmed'?`<button class="btn-success" onclick="checkInBooking('${myBook.id}')">✅ Check In Now</button>`:'<span style="color:var(--emerald);font-weight:700">✅ Checked In!</span>'}
+          ${myBook.status==='confirmed'?`<button class="btn-danger" onclick="cancelBooking('${myBook.id}')">❌ Cancel</button>`:''}
+        </div>
+      </div>
+      <div class="cd-ring-wrap">
+        <div class="cd-svg-wrap">
+          <svg class="cd-svg" viewBox="0 0 80 80" width="100" height="100">
+            <circle class="cd-track" cx="40" cy="40" r="36" />
+            <circle class="cd-arc${isUrgent?' urgent':''}" cx="40" cy="40" r="36"
+              style="stroke-dasharray:${circum};stroke-dashoffset:${offset}" />
+          </svg>
+          <div class="cd-inner">
+            <div class="cd-time${isUrgent?' urgent':''}">${mins}m<br/>${String(secs).padStart(2,'0')}s</div>
+          </div>
+        </div>
+        <div class="cd-label">${label}</div>
+      </div>`;
+  }
+  tick();
+  countdownIntvl = setInterval(tick, 1000);
+}
+
+// ─── CHECK-IN ───────────────────────────────────────────────────────
+function openCheckinModal() {
+  const now  = new Date();
+  const myId = currentUser.id || currentUser.username;
+  const mine = bookings.filter(b => {
+    if (b.userId!==myId||b.status!=='confirmed') return false;
+    const s = new Date(b.date+'T'+b.timeStart);
+    const diff = (s-now)/60000;
+    return diff<=CHECKIN_WIN_MINS && diff>-FORFEITURE_MINS;
+  });
+  const body = document.getElementById('checkinModalBody');
+  if (!mine.length) {
+    body.innerHTML = `<div class="empty-state"><span class="es-icon">⚓</span><p class="es-text">No bookings ready for check-in!</p><p style="font-size:0.78rem;color:var(--t400);margin-top:8px">Check-in opens 30 minutes before your reservation.</p></div>`;
+  } else {
+    body.innerHTML = mine.map(b => {
+      const berth = berths.find(br=>br.id===b.berthId);
+      return `
+        <div class="mm-info">
+          <div class="mm-row"><span class="mm-label">Berth</span><span class="mm-val">${berth?berth.emoji+' '+berth.name:b.berthId}</span></div>
+          <div class="mm-row"><span class="mm-label">Date</span><span class="mm-val">${b.date}</span></div>
+          <div class="mm-row"><span class="mm-label">Time</span><span class="mm-val">${b.timeStart}–${b.timeEnd}</span></div>
+        </div>
+        <div class="mm-actions">
+          <button class="btn-sec" onclick="closeModal('checkinModal')">Not Now</button>
+          <button class="btn-success" onclick="checkInBooking('${b.id}')">✅ Check In Now</button>
+        </div>`;
+    }).join('<hr style="border:none;border-top:1px solid rgba(255,255,255,0.07);margin:14px 0"/>');
+  }
+  document.getElementById('checkinModal').style.display = 'flex';
+}
+function checkInBooking(id) {
+  const b = bookings.find(x=>x.id===id);
+  if (!b||b.status!=='confirmed') { showToast('error','Cannot check in — invalid booking!'); return; }
+  b.status = 'checked_in'; b.checkedInAt = new Date().toISOString();
+  const u = users.find(u=>u.id===b.userId||u.username===b.userId);
+  if (u) { u.checkIns=(u.checkIns||0)+1; u.reliabilityScore=Math.min(100,(u.reliabilityScore||100)+CHECKIN_REWARD); currentUser=u; }
+  saveData();
+  closeModal('checkinModal');
+  showToast('success','✅ Checked in at '+b.berthId+'! Den Den Mushi notified!');
+  fireDendenAlert('BRRING! ✅ Check-in confirmed at '+b.berthId+'! Welcome aboard, Captain!');
+  renderDashboard();
+}
+
+// ─── NO-SHOW CHECKER ────────────────────────────────────────────────
+function checkNoShows() {
+  const now = new Date();
+  let changed = false;
+  bookings.forEach(b => {
+    if (b.status!=='confirmed') return;
+    const forf = new Date(new Date(b.date+'T'+b.timeStart).getTime()+FORFEITURE_MINS*60000);
+    if (now > forf) {
+      b.status = 'no_show'; b.noShowAt = now.toISOString();
+      const u = users.find(u=>u.id===b.userId||u.username===b.userId);
+      if (u && !b.nsPenaltyApplied) {
+        u.noShows = (u.noShows||0)+1;
+        u.reliabilityScore = Math.max(0,(u.reliabilityScore||100)-NO_SHOW_PENALTY);
+        b.nsPenaltyApplied = true;
+        noShowLog.push({ date:b.date, userId:b.userId, userName:b.userName, berthId:b.berthId, type:'no_show', penalty:-NO_SHOW_PENALTY, at:now.toISOString() });
+        if (u.username===currentUser?.username) { currentUser=u; showToast('warning','⚠️ No-show penalty applied! Score -'+NO_SHOW_PENALTY); }
+      }
+      changed = true;
+    }
+  });
+  if (changed) saveData();
+}
+
+// ─── CANCEL ─────────────────────────────────────────────────────────
+function openCancelFromDash() {
+  const myId = currentUser.id||currentUser.username;
+  const mine = bookings.filter(b=>b.userId===myId&&b.status==='confirmed'&&new Date(b.date+'T'+b.timeStart)>new Date());
+  if (!mine.length) { showToast('info','No upcoming bookings to cancel!'); return; }
+  openCancelModal(mine[0].id);
+}
+function cancelBooking(id) { openCancelModal(id); }
+function openCancelModal(id) {
+  const b = bookings.find(x=>x.id===id); if(!b) return;
+  const berth = berths.find(x=>x.id===b.berthId);
+  document.getElementById('cancelModalBody').innerHTML = `
+    <p style="color:var(--t300);font-size:0.88rem;margin-bottom:16px">Cancel this reservation? Your reliability score will drop by <strong style="color:var(--crimson)">${CANCEL_PENALTY} points</strong>.</p>
+    <div class="mm-info">
+      <div class="mm-row"><span class="mm-label">Berth</span><span class="mm-val">${berth?berth.emoji+' '+berth.name:b.berthId}</span></div>
+      <div class="mm-row"><span class="mm-label">Date</span><span class="mm-val">${b.date}</span></div>
+      <div class="mm-row"><span class="mm-label">Time</span><span class="mm-val">${b.timeStart}–${b.timeEnd}</span></div>
+    </div>
+    <div class="mm-actions">
+      <button class="btn-sec" onclick="closeModal('cancelModal')">Keep Booking</button>
+      <button class="btn-danger" onclick="confirmCancel('${id}')">❌ Cancel Reservation</button>
+    </div>`;
+  document.getElementById('cancelModal').style.display = 'flex';
+}
+function confirmCancel(id) {
+  const b = bookings.find(x=>x.id===id); if(!b) return;
+  b.status='cancelled'; b.cancelledAt=new Date().toISOString();
+  const u = users.find(u=>u.id===b.userId||u.username===b.userId);
+  if (u) {
+    u.cancelledBookings=(u.cancelledBookings||0)+1;
+    u.reliabilityScore=Math.max(0,(u.reliabilityScore||100)-CANCEL_PENALTY);
+    currentUser=u;
+    noShowLog.push({ date:b.date, userId:b.userId, userName:b.userName, berthId:b.berthId, type:'cancelled', penalty:-CANCEL_PENALTY, at:new Date().toISOString() });
+  }
+  saveData(); closeModal('cancelModal');
+  showToast('warning','❌ Cancelled — berth freed. Score -'+CANCEL_PENALTY);
+  renderDashboard();
+  if (document.getElementById('viewHistory').classList.contains('active-view')) renderHistory();
+}
+function closeModal(id) { const el=document.getElementById(id); if(el) el.style.display='none'; }
+
+// ─── BOOK VIEW ──────────────────────────────────────────────────────
+function renderBookView() {
+  setTodayMin();
+  renderBookBerths();
+}
+function renderBookBerths() {
+  const grid   = document.getElementById('bookBerthGrid'); if(!grid) return;
+  const date   = document.getElementById('bookDate')?.value;
+  const tStart = document.getElementById('bookTimeStart')?.value;
+  const tEnd   = document.getElementById('bookTimeEnd')?.value;
+  const filter = document.getElementById('bookShipFilter')?.value;
+
+  let list = berths;
+  if (filter) list = berths.filter(b=>b.type===filter);
+
+  grid.innerHTML = list.map(b => {
+    const conflict = date&&tStart&&tEnd ? hasConflict(b.id,date,tStart,tEnd) : false;
+    const sel = b.id===selectedBerthId;
+    const cls = sel?'bbc-selected':conflict?'bbc-unavailable':'bbc-available';
+    return `
+      <div class="bbc ${cls}" ${conflict?'':'onclick="selectBookBerth(\''+b.id+'\')"'}>
+        <div style="font-size:1.6rem">${b.emoji}</div>
+        <div style="font-weight:700;font-size:0.82rem;margin-top:4px;color:var(--t100)">${b.id}</div>
+        <div style="font-size:0.66rem;color:var(--t400)">${b.type}</div>
+        <div style="font-size:0.64rem;margin-top:4px;color:${conflict?'var(--crimson)':'var(--emerald)'}">${conflict?'🔴 Taken':'🟢 Free'}</div>
+        ${sel?'<div style="font-size:0.65rem;color:var(--gold);font-weight:700;margin-top:2px">✓ SELECTED</div>':''}
+      </div>`;
+  }).join('');
+}
+function selectBookBerth(id) {
+  selectedBerthId = id;
+  const berth = berths.find(b=>b.id===id);
+  if (berth) {
+    const info = document.getElementById('selectedBerthInfo');
+    const det  = document.getElementById('selBerthDetails');
+    if (info) info.style.display='block';
+    if (det) det.innerHTML = `<strong>${berth.emoji} ${berth.name}</strong><br/>Type: ${berth.type}<br/><em>${berth.desc}</em>`;
+    document.getElementById('confirmBookBtn').disabled = false;
+    document.getElementById('bookConflictMsg').classList.add('hidden');
+  }
+  renderBookBerths();
+}
+function hasConflict(berthId, date, s, e, excludeId=null) {
+  const ns = new Date(date+'T'+s).getTime(), ne = new Date(date+'T'+e).getTime();
+  return bookings.some(b => {
+    if (b.id===excludeId||b.berthId!==berthId) return false;
+    if (b.status==='cancelled'||b.status==='no_show') return false;
+    const bs = new Date(b.date+'T'+b.timeStart).getTime(), be = new Date(b.date+'T'+b.timeEnd).getTime();
+    return ns<be && ne>bs;
+  });
+}
+function createBooking() {
+  const date   = document.getElementById('bookDate').value;
+  const tStart = document.getElementById('bookTimeStart').value;
+  const tEnd   = document.getElementById('bookTimeEnd').value;
+  const notes  = document.getElementById('bookNotes').value.trim();
+  const cEl    = document.getElementById('bookConflictMsg');
+  const sEl    = document.getElementById('bookSuccessMsg');
+  cEl.classList.add('hidden'); sEl.classList.add('hidden');
+
+  if (!selectedBerthId) { showToast('error','⚓ Select a berth first!'); return; }
+  if (!date||!tStart||!tEnd) { showToast('error','⏰ Fill in date and time!'); return; }
+  if (tStart>=tEnd) { showToast('error','⏰ End time must be after start time!'); return; }
+  if (date < new Date().toISOString().split('T')[0]) { showToast('error','📅 Cannot book a past date!'); return; }
+  if (hasConflict(selectedBerthId, date, tStart, tEnd)) { cEl.classList.remove('hidden'); renderBookBerths(); return; }
+
+  const uid = currentUser.id||currentUser.username;
+  const bk = {
+    id:'BK'+Date.now(), userId:uid, userName:currentUser.name||currentUser.username,
+    berthId:selectedBerthId, date, timeStart:tStart, timeEnd:tEnd,
+    notes, status:'confirmed', createdAt:new Date().toISOString(),
+    shipType:currentUser.shipType||'Sloop'
+  };
+  bookings.push(bk);
+  const u = users.find(u=>u.id===uid||u.username===uid);
+  if (u) { u.totalBookings=(u.totalBookings||0)+1; currentUser=u; }
+  saveData();
+  sEl.classList.remove('hidden');
+  showToast('success',`✅ Berth ${selectedBerthId} reserved for ${date} at ${tStart}!`);
+  fireDendenAlert(`BRRING! 📋 Booking confirmed! ${selectedBerthId} is yours on ${date} at ${tStart}!`);
+  selectedBerthId=null;
+  document.getElementById('bookNotes').value='';
+  document.getElementById('confirmBookBtn').disabled=true;
+  document.getElementById('selectedBerthInfo').style.display='none';
+  renderBookBerths();
+  setTimeout(()=>showView('dashboard'),1600);
+}
+
+// ─── HISTORY ────────────────────────────────────────────────────────
+function renderHistory() {
+  checkNoShows();
+  const list = document.getElementById('historyList'); if(!list) return;
+  const uid  = currentUser.id||currentUser.username;
+  const isAdmin = currentUser.role==='admin';
+  let mine = isAdmin ? bookings : bookings.filter(b=>b.userId===uid);
+  if (historyFilter!=='all') mine=mine.filter(b=>b.status===historyFilter);
+  mine = [...mine].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+
+  if (!mine.length) { list.innerHTML=`<div class="empty-state"><span class="es-icon">📜</span><p class="es-text">No voyages recorded yet, Captain!</p></div>`; return; }
+
+  const now = new Date();
+  const icons = { confirmed:'📋', checked_in:'✅', cancelled:'❌', no_show:'🚫', completed:'🏆' };
+  list.innerHTML = mine.map(b => {
+    const berth    = berths.find(x=>x.id===b.berthId);
+    const canCancel= b.status==='confirmed' && new Date(b.date+'T'+b.timeStart)>now;
+    const canCheckin= b.status==='confirmed' && (() => {
+      const s = new Date(b.date+'T'+b.timeStart), diff=(s-now)/60000;
+      return diff<=CHECKIN_WIN_MINS && diff>-FORFEITURE_MINS;
+    })();
+    return `
+      <div class="hmc hmc-${b.status}">
+        <div class="h-icon">${icons[b.status]||'📋'}</div>
+        <div>
+          <div class="h-berth">${berth?berth.emoji+' '+berth.name:b.berthId}</div>
+          <div class="h-meta">📅 ${b.date} · ⏰ ${b.timeStart}–${b.timeEnd} · 🚢 ${b.shipType||'N/A'}</div>
+          <div class="h-time">Booked: ${new Date(b.createdAt).toLocaleString()}${isAdmin?' · 👤 '+b.userName:''}</div>
+          ${b.notes?`<div class="h-time">📝 ${b.notes}</div>`:''}
+        </div>
+        <div class="h-right">
+          <span class="h-pill hp-${b.status}">${b.status.replace('_',' ')}</span>
+          <div class="h-acts">
+            ${canCheckin?`<button class="h-ci-btn" onclick="checkInBooking('${b.id}')">✅ Check In</button>`:''}
+            ${canCancel?`<button class="h-cn-btn" onclick="openCancelModal('${b.id}')">❌ Cancel</button>`:''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+function filterHistory(s, btn) {
+  historyFilter=s;
+  document.querySelectorAll('.hf').forEach(b=>b.classList.remove('active'));
+  btn?.classList.add('active');
+  renderHistory();
+}
+
+// ─── ADMIN ──────────────────────────────────────────────────────────
+function renderAdmin() {
+  checkNoShows();
+  renderAdminStats();
+  renderAdminCharts();
+  renderAdminTable();
+  renderAdminUsers();
+  renderAdminIncidents();
+}
+function renderAdminStats() {
+  const now = new Date();
+  const stats = [
+    { icon:'📋', val:bookings.length,                                         label:'Total Bookings' },
+    { icon:'✅', val:bookings.filter(b=>b.status==='checked_in').length,       label:'Checked In' },
+    { icon:'⏳', val:bookings.filter(b=>b.status==='confirmed').length,        label:'Confirmed' },
+    { icon:'❌', val:bookings.filter(b=>b.status==='cancelled').length,        label:'Cancelled' },
+    { icon:'🚫', val:bookings.filter(b=>b.status==='no_show').length,          label:'No-Shows' },
+    { icon:'⚓', val:bookings.filter(b=>isActiveNow(b)&&(b.status==='confirmed'||b.status==='checked_in')).length, label:'Active Now' },
+    { icon:'👥', val:users.length,                                             label:'Captains' },
+    { icon:'🚢', val:berths.length,                                            label:'Berths' },
+  ];
+  document.getElementById('adminStatsGrid').innerHTML = stats.map(s=>`
+    <div class="ams">
+      <span class="ams-icon">${s.icon}</span>
+      <div class="ams-val">${s.val}</div>
+      <div class="ams-label">${s.label}</div>
+    </div>`).join('');
+}
+function renderAdminCharts() {
+  const canvas = document.getElementById('statusChart'); if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const data = { confirmed:'#06d6f0', checked_in:'#10b981', cancelled:'#ef4444', no_show:'#fbbf24', completed:'#8b5cf6' };
+  const counts = Object.keys(data).map(k => bookings.filter(b=>b.status===k).length);
+  const total  = counts.reduce((a,b)=>a+b, 0);
+  ctx.clearRect(0,0,200,200);
+  if (!total) {
+    ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.beginPath(); ctx.arc(100,100,80,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#4e6a84'; ctx.font='12px Inter'; ctx.textAlign='center'; ctx.fillText('No data yet',100,105);
+  } else {
+    let ang=-Math.PI/2;
+    Object.entries(data).forEach(([k,col],i)=>{
+      const c=counts[i]; if(!c) return;
+      const slice=(c/total)*2*Math.PI;
+      ctx.beginPath(); ctx.moveTo(100,100); ctx.arc(100,100,80,ang,ang+slice); ctx.closePath();
+      ctx.fillStyle=col; ctx.fill(); ang+=slice;
+    });
+    ctx.beginPath(); ctx.arc(100,100,44,0,Math.PI*2); ctx.fillStyle='#0a1628'; ctx.fill();
+    ctx.fillStyle='#8fa5be'; ctx.font='11px Inter'; ctx.textAlign='center'; ctx.fillText(total+' total',100,105);
+  }
+  document.getElementById('pieLegend').innerHTML = Object.entries(data).map(([k,col],i)=>`
+    <div class="pl-item">
+      <span class="pl-dot" style="background:${col}"></span>
+      <span>${k.replace('_',' ')}: <strong>${counts[i]}</strong></span>
+    </div>`).join('');
+
+  // Bar chart
+  const ships = { Sloop:0, Galleon:0, 'Marine Warship':0 };
+  bookings.forEach(b=>{ if(ships[b.shipType]!==undefined) ships[b.shipType]++; });
+  const maxS = Math.max(...Object.values(ships),1);
+  const barCols = { Sloop:'#06d6f0', Galleon:'#10b981', 'Marine Warship':'#8b5cf6' };
+  document.getElementById('shipBarChart').innerHTML = Object.entries(ships).map(([t,c])=>`
+    <div class="bar-item">
+      <div class="bar-label"><span>${t}</span><span>${c}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(c/maxS)*100}%;background:${barCols[t]}"></div></div>
+    </div>`).join('');
+}
+function renderAdminTable() {
+  const q = (document.getElementById('adminSearch')?.value||'').toLowerCase();
+  let list = bookings.filter(b=>
+    (b.userName||b.userId||'').toLowerCase().includes(q)||(b.berthId||'').toLowerCase().includes(q)||(b.id||'').toLowerCase().includes(q)
+  ).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  const cols = { confirmed:'#06d6f0',checked_in:'#10b981',cancelled:'#ef4444',no_show:'#fbbf24',completed:'#8b5cf6' };
+  document.getElementById('adminTableBody').innerHTML = list.slice(0,50).map(b=>`
+    <tr>
+      <td><code style="font-size:0.68rem;color:var(--t400)">${b.id}</code></td>
+      <td>${b.userName||b.userId}</td><td>${b.berthId}</td><td>${b.shipType||'N/A'}</td>
+      <td>${b.date}</td><td>${b.timeStart}–${b.timeEnd}</td>
+      <td><span class="h-pill" style="background:${cols[b.status]||'#fff'}22;color:${cols[b.status]||'#fff'};border:1px solid ${cols[b.status]||'#fff'}44">${b.status.replace('_',' ')}</span></td>
+      <td>
+        ${b.status==='confirmed'?`<button class="h-ci-btn" onclick="adminCheckIn('${b.id}')">✅</button>`:''}
+        ${b.status==='confirmed'?`<button class="h-cn-btn" onclick="openCancelModal('${b.id}')">❌</button>`:''}
+      </td>
+    </tr>`).join('')||`<tr><td colspan="8" style="text-align:center;color:var(--t400);padding:24px">No bookings found</td></tr>`;
+}
+function adminCheckIn(id) {
+  const b=bookings.find(x=>x.id===id); if(!b) return;
+  b.status='checked_in'; b.checkedInAt=new Date().toISOString();
+  const u=users.find(u=>u.id===b.userId||u.username===b.userId);
+  if(u){u.checkIns=(u.checkIns||0)+1;u.reliabilityScore=Math.min(100,(u.reliabilityScore||100)+CHECKIN_REWARD);}
+  saveData(); showToast('success','Check-in confirmed for '+b.userName); renderAdmin();
+}
+function renderAdminUsers() {
+  document.getElementById('adminUsersBody').innerHTML = users.map(u=>`
+    <tr>
+      <td><strong>${u.username}</strong></td><td>${u.name}</td><td>${u.shipType||'N/A'}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:5px;background:rgba(255,255,255,0.07);border-radius:99px;overflow:hidden">
+            <div style="width:${u.reliabilityScore||100}%;height:100%;background:${(u.reliabilityScore||100)>=75?'var(--emerald)':(u.reliabilityScore||100)>=50?'var(--amber)':'var(--crimson)'};border-radius:99px"></div>
+          </div>
+          <strong style="font-size:0.8rem;color:${(u.reliabilityScore||100)>=75?'var(--emerald)':(u.reliabilityScore||100)>=50?'var(--amber)':'var(--crimson)'}">${u.reliabilityScore||100}</strong>
+        </div>
+      </td>
+      <td>${u.totalBookings||0}</td>
+      <td style="color:${u.noShows>0?'var(--crimson)':'var(--t300)'}">${u.noShows||0}</td>
+      <td style="color:${u.cancelledBookings>0?'var(--amber)':'var(--t300)'}">${u.cancelledBookings||0}</td>
+    </tr>`).join('')||`<tr><td colspan="7" style="text-align:center;color:var(--t400);padding:24px">No captains registered</td></tr>`;
+}
+function renderAdminIncidents() {
+  document.getElementById('adminNoshowBody').innerHTML = noShowLog.slice().reverse().slice(0,30).map(n=>`
+    <tr>
+      <td>${n.date}</td><td>${n.userName||n.userId}</td><td>${n.berthId}</td>
+      <td><span class="status-3d-pill ${n.type==='no_show'?'pill3d-no_show':'pill3d-cancelled'}">${n.type.replace('_',' ')}</span></td>
+      <td style="color:${n.penalty<0?'var(--crimson)':'var(--emerald)'}">${n.penalty}</td>
+    </tr>`).join('')||`<tr><td colspan="5" style="text-align:center;color:var(--text-400);padding:24px">No incidents! Fair winds ⛵</td></tr>`;
+}
+
+// ─── DEN DEN MUSHI ──────────────────────────────────────────────────
+function fireDendenAlert(msg) {
+  const el  = document.getElementById('dendenAlert');
+  const mEl = document.getElementById('dendenMsg');
+  if (!el||!mEl) return;
+  mEl.textContent = msg;
+  el.classList.remove('hidden');
+  playDendenBell();
+  clearTimeout(window._ddt);
+  window._ddt = setTimeout(closeDenden, 5000);
+}
+function closeDenden() { document.getElementById('dendenAlert')?.classList.add('hidden'); }
+function playDendenBell() {
+  try {
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    [[880,0],[1100,0.18],[1320,0.36],[880,0.54]].forEach(([freq,delay])=>{
+      const osc=ctx.createOscillator(), gain=ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type='sine';
+      gain.gain.setValueAtTime(0.25, ctx.currentTime+delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+delay+1.2);
+      osc.start(ctx.currentTime+delay); osc.stop(ctx.currentTime+delay+1.2);
+    });
+  } catch(e){}
+}
+
+// ─── TOASTS ─────────────────────────────────────────────────────────
+function showToast(type, msg) {
+  const c = document.getElementById('toastContainer'); if(!c) return;
+  const icons = { success:'✅', error:'❌', info:'ℹ️', warning:'⚠️' };
+  const t = document.createElement('div');
+  t.className = 'toast-3d '+type;
+  t.innerHTML = `<span class="toast-3d-icon">${icons[type]}</span><span class="toast-3d-msg">${msg}</span>`;
+  c.appendChild(t);
+  setTimeout(()=>{ t.style.transition='all 0.3s ease'; t.style.opacity='0'; t.style.transform='translateX(100%)'; setTimeout(()=>t.remove(),300); }, 3500);
+}
+
+// ─── SEED DEMO DATA ──────────────────────────────────────────────────
+(function seed() {
+  if (localStorage.getItem('gl_seeded2')) return;
+  const demo = [
+    { id:'U001',name:'Monkey D. Luffy',username:'luffy',email:'luffy@strawhats.sea',password:'gomugomu',shipType:'Sloop',reliabilityScore:72,totalBookings:8,completedBookings:5,cancelledBookings:2,noShows:1,checkIns:5,joinedAt:'2026-01-15T08:00:00Z',role:'user' },
+    { id:'U002',name:'Roronoa Zoro',username:'zoro',email:'zoro@strawhats.sea',password:'santoryu',shipType:'Galleon',reliabilityScore:95,totalBookings:12,completedBookings:11,cancelledBookings:1,noShows:0,checkIns:11,joinedAt:'2026-01-16T09:00:00Z',role:'user' },
+    { id:'U003',name:'Nami',username:'nami',email:'nami@strawhats.sea',password:'weatheria',shipType:'Sloop',reliabilityScore:88,totalBookings:15,completedBookings:13,cancelledBookings:2,noShows:0,checkIns:13,joinedAt:'2026-01-17T10:00:00Z',role:'user' },
+    { id:'U004',name:'Smoker',username:'smoker',email:'smoker@marines.gov',password:'mokeymoke',shipType:'Marine Warship',reliabilityScore:99,totalBookings:20,completedBookings:19,cancelledBookings:1,noShows:0,checkIns:19,joinedAt:'2026-01-18T07:00:00Z',role:'user' },
+  ];
+  demo.forEach(u=>{ if(!users.find(x=>x.username===u.username)) users.push(u); });
+
+  const today    = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now()+86400000).toISOString().split('T')[0];
+  const past     = new Date(Date.now()-86400000).toISOString().split('T')[0];
+  const bks = [
+    { id:'BK001',userId:'U002',userName:'Roronoa Zoro',berthId:'B2',date:today,timeStart:'09:00',timeEnd:'11:00',status:'confirmed',createdAt:'2026-09-27T08:00:00Z',shipType:'Galleon',notes:'Wado Ichimonji maintenance.' },
+    { id:'BK002',userId:'U003',userName:'Nami',berthId:'B4',date:today,timeStart:'13:00',timeEnd:'15:00',status:'checked_in',checkedInAt:new Date().toISOString(),createdAt:'2026-09-27T09:00:00Z',shipType:'Sloop',notes:'Updating weather charts.' },
+    { id:'BK003',userId:'U004',userName:'Smoker',berthId:'B6',date:tomorrow,timeStart:'08:00',timeEnd:'12:00',status:'confirmed',createdAt:'2026-09-27T10:00:00Z',shipType:'Marine Warship',notes:'Marine G-5 inspection.' },
+    { id:'BK004',userId:'U001',userName:'Monkey D. Luffy',berthId:'B1',date:past,timeStart:'10:00',timeEnd:'12:00',status:'no_show',nsPenaltyApplied:true,createdAt:'2026-09-26T08:00:00Z',shipType:'Sloop',notes:'Rubber powers!' },
+    { id:'BK005',userId:'U001',userName:'Monkey D. Luffy',berthId:'B12',date:tomorrow,timeStart:'14:00',timeEnd:'16:00',status:'confirmed',createdAt:'2026-09-27T11:00:00Z',shipType:'Sloop',notes:'Meat storage required!' },
+    { id:'BK006',userId:'U003',userName:'Nami',berthId:'B11',date:past,timeStart:'08:00',timeEnd:'10:00',status:'completed',createdAt:'2026-09-25T07:00:00Z',shipType:'Sloop',notes:'Logged treasure maps.' },
+    { id:'BK007',userId:'U002',userName:'Roronoa Zoro',berthId:'B5',date:past,timeStart:'12:00',timeEnd:'14:00',status:'cancelled',cancelledAt:'2026-09-26T11:00:00Z',createdAt:'2026-09-26T06:00:00Z',shipType:'Galleon',notes:'Got lost again.' },
+  ];
+  bks.forEach(b=>{ if(!bookings.find(x=>x.id===b.id)) bookings.push(b); });
+  noShowLog.push({ date:past, userId:'U001', userName:'Monkey D. Luffy', berthId:'B1', type:'no_show', penalty:-NO_SHOW_PENALTY, at:new Date().toISOString() });
+  noShowLog.push({ date:past, userId:'U002', userName:'Roronoa Zoro', berthId:'B5', type:'cancelled', penalty:-CANCEL_PENALTY, at:new Date().toISOString() });
+  saveData(); localStorage.setItem('gl_seeded2','1');
+})();

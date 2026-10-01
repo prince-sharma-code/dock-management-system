@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Galley-La DockMaster — Water 7 Shipyards | Grand Line Harbor Authority</title>
+  <meta name="description" content="Galley-La Company's official tamper-proof dock slip reservation system — Water 7, Grand Line. Reserve berths, moor vessels, track voyage logs, and explore with Mayor Iceburg."/>
+  
+  <!-- Google Fonts: Pirate font (Pirata One), Cinzel Decorative, Outfit, Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  
+  <!-- Three.js 3D Engine for 3D Water & Ship Scene -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- WATER ATTRACTION ANIMATED CURSOR SYSTEM                        -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<canvas id="waterCursorCanvas"></canvas>
+<div id="animeCursorWrap">
+  <div id="animeCompassDial">
+    <span class="ac-rune ac-n">N</span>
+    <span class="ac-rune ac-e">E</span>
+    <span class="ac-rune ac-s">S</span>
+    <span class="ac-rune ac-w">W</span>
+  </div>
+  <div id="animeWaterCore"></div>
+  <div id="animeLockRing"></div>
+</div>
+
+<!-- Ambient Background Particle Canvas -->
+<canvas id="particleCanvas"></canvas>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- Instant Direct Platform Load (Splash screen removed to prevent blank first page) -->
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- AUTH SCREEN                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="authScreen" class="auth-screen hidden">
+  <div class="auth-parallax">
+    <div class="ap-layer ap-bg" style="background-image:url('assets/water7_fountain.png')"></div>
+    <div class="ap-overlay"></div>
+    <div class="ap-vignette"></div>
+  </div>
+  <div class="manga-grid-bg"></div>
+
+  <!-- Interactive 3D Characters on Auth Screen -->
+  <div class="auth-char auth-char-left" style="background-image:url('assets/zoro_aura.png')" id="authCharL">
+    <div class="char-aura aura-crimson"></div>
+    <div class="char-tag font-pirate">RORONOA ZORO</div>
+  </div>
+  <div class="auth-char auth-char-right" style="background-image:url('assets/luffy_hero.png')" id="authCharR">
+    <div class="char-aura aura-gold"></div>
+    <div class="char-tag font-pirate">MONKEY D. LUFFY</div>
+  </div>
+
+  <div class="auth-center-panel">
+    <div class="auth-brand">
+      <div class="auth-brand-logo-wrap">
+        <img src="assets/logo.jpg" class="auth-logo" alt="Logo"/>
+        <div class="brand-glow"></div>
+      </div>
+      <div class="auth-brand-text">
+        <span class="auth-brand-badge font-heading">GALLEY-LA SHIPYARDS · WATER 7 GRAND LINE</span>
+        <span class="auth-brand-name font-pirate">GALLEY-LA DOCKMASTER</span>
+        <span class="auth-brand-sub">Mayor Iceburg's Official Dock Slip Reservation System</span>
+      </div>
+    </div>
+
+    <!-- Glass Authentication Card -->
+    <div class="auth-card" id="authCard">
+      <div class="auth-card-sheen"></div>
+
+      <!-- Login Panel -->
+      <div id="loginPanel" class="auth-panel">
+        <div class="panel-divider"><span></span><span class="font-pirate">⚓ CAPTAIN'S LOG IN</span><span></span></div>
+        <p class="panel-lore">Welcome back to Water 7, Captain of the Grand Line</p>
+        
+        <div class="input-field">
+          <span class="if-icon">👤</span>
+          <input type="text" id="loginUsername" placeholder="Captain call sign / Pirate name" autocomplete="username"/>
+          <div class="if-line"></div>
+        </div>
+        <div class="input-field">
+          <span class="if-icon">🔒</span>
+          <input type="password" id="loginPassword" placeholder="Secret pirate code" autocomplete="current-password"/>
+          <div class="if-line"></div>
+        </div>
+        
+        <div id="loginError" class="auth-err hidden"></div>
+        
+        <button class="btn-manga-primary" onclick="handleLogin()">
+          <span class="bmp-bg"></span>
+          <span class="bmp-shine"></span>
+          <span class="bmp-text font-pirate">⚓ Enter Water 7 Harbor</span>
+        </button>
+        
+        <button class="btn-manga-admin" onclick="handleAdminLogin()">
+          <span>🏛</span> Dockmaster Admin (Iceburg)
+        </button>
+        
+        <p class="auth-switch">New crew in Water 7? <a href="#" onclick="showRegister(event)">Register your ship & crew →</a></p>
+        <div class="demo-chip">
+          🧪 Quick Demo: <code>luffy</code> / <code>gomugomu</code> &nbsp;|&nbsp; Admin: <code>iceburg</code> / <code>galleyla2024</code>
+        </div>
+      </div>
+
+      <!-- Register Panel -->
+      <div id="registerPanel" class="auth-panel hidden">
+        <div class="panel-divider"><span></span><span class="font-pirate">⛵ REGISTER FLEET</span><span></span></div>
+        <p class="panel-lore">Register your ship & crew on the Water 7 official registry</p>
+        
+        <div class="input-row-2">
+          <div class="input-field"><span class="if-icon">🏴‍☠️</span><input type="text" id="regName" placeholder="Captain's name"/><div class="if-line"></div></div>
+          <div class="input-field"><span class="if-icon">📛</span><input type="text" id="regUsername" placeholder="Call sign"/><div class="if-line"></div></div>
+        </div>
+        <div class="input-field"><span class="if-icon">📡</span><input type="email" id="regEmail" placeholder="Den Den Mushi frequency / email"/><div class="if-line"></div></div>
+        <div class="input-field"><span class="if-icon">🔒</span><input type="password" id="regPassword" placeholder="Secret code (min 6 characters)"/><div class="if-line"></div></div>
+        <div class="input-field">
+          <span class="if-icon">🚢</span>
+          <select id="regShipType">
+            <option value="Sloop">🛶 Sloop — Small (e.g. Going Merry / Mini Merry)</option>
+            <option value="Galleon">⛵ Galleon — Medium (e.g. Thousand Sunny / Red Force)</option>
+            <option value="Marine Warship">🚢 Marine Warship — Heavy (e.g. Buster Call Battleship)</option>
+          </select>
+          <div class="if-line"></div>
+        </div>
+        
+        <div id="regError" class="auth-err hidden"></div>
+        
+        <button class="btn-manga-primary" onclick="handleRegister()">
+          <span class="bmp-bg"></span><span class="bmp-shine"></span>
+          <span class="bmp-text font-pirate">⛵ Register Fleet & Claim Berth</span>
+        </button>
+        <p class="auth-switch">Already docked at Water 7? <a href="#" onclick="showLogin(event)">Log in →</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- MAIN APPLICATION PLATFORM                                      -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="mainApp" class="main-app">
+
+  <!-- TOP NAVIGATION BAR -->
+  <nav class="app-nav" id="appNav">
+    <div class="nav-glass"></div>
+    <div class="nav-inner">
+      <!-- Brand Group -->
+      <div class="nav-logo-group" onclick="showView('dashboard')">
+        <div class="nav-logo-circle">
+          <img src="assets/logo.jpg" class="nav-logo-img" alt="Galley-La Crest"/>
+        </div>
+        <div>
+          <div class="nav-title font-pirate">GALLEY-LA DOCKMASTER</div>
+          <div class="nav-loc font-heading">
+            <span class="nl-tag">GALLEY-LA</span> • <span class="nl-ps">DOCK 1-12</span> • <span>WATER 7 GRAND LINE</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Navigation Tabs -->
+      <div class="nav-links">
+        <button class="nav-link active" id="navDash" onclick="showView('dashboard')">
+          <span>⚓</span> Harbor <span class="nav-badge nb-green">LIVE</span>
+        </button>
+        <button class="nav-link" id="navBook" type="button" onclick="openBookingFromNav()">
+          <span>📋</span> Book Slip <span class="nav-badge nb-gold" id="navAvailBadge">10 Open</span>
+        </button>
+        <button class="nav-link" id="navHistory" type="button" onclick="openVoyageLogFromNav()">
+          <span>📜</span> Voyage Log <span class="nav-badge nb-blue" id="navHistoryBadge">0</span>
+        </button>
+        <button class="nav-link admin-nl hidden" id="navAdmin" onclick="showView('admin')">
+          <span>🏛</span> Control Room
+        </button>
+      </div>
+
+      <!-- Ambience Controls & Fortune -->
+      <div class="nav-action-tools">
+        <!-- Sea Ambiance Audio Toggle -->
+        <button id="btnSeaAmbiance" class="btn-tool-pill" onclick="toggleSeaAmbiance()" title="Play/Pause Ocean Surf Sound">
+          <span id="seaAmbianceIcon">🌊</span>
+          <span class="tool-label">Sea Waves</span>
+        </button>
+        
+        <!-- Sound FX Toggle -->
+        <button id="btnSoundFX" class="btn-tool-pill" onclick="toggleSoundFX()" title="Sound Effects Toggle">
+          <span id="soundFXIcon">🔊</span>
+          <span class="tool-label">SFX</span>
+        </button>
+
+        <!-- Backend Sync -->
+        <button id="btnSupabaseSync" class="btn-supabase-pill" onclick="syncBackendNow()" title="Sync harbor data to backend">
+          <span>☁️</span>
+          <span class="tool-label">Sync</span>
+        </button>
+
+        <!-- Volume Control -->
+        <div class="audio-volume-control" title="Adjust harbor audio volume">
+          <span>🔊</span>
+          <input id="audioVolumeSlider" type="range" min="0" max="100" value="80" oninput="setAudioVolume(this.value / 100)"/>
+          <span id="audioVolumeValue">80%</span>
+        </div>
+        
+        <!-- Grand Line Fortune Wheel -->
+        <button class="btn-tool-roulette" onclick="openRouletteModal()" title="Spin the Grand Line Wheel of Fortune">
+          <span>🎡</span>
+          <span class="tool-label">Fortune</span>
+        </button>
+      </div>
+
+      <!-- User Profile & Departure -->
+      <div class="nav-user-grp">
+        <div class="nav-avatar" id="navAvatar">L</div>
+        <div>
+          <div class="nav-uname font-heading" id="navUsername">Captain</div>
+          <div class="nav-score" id="navScoreMini">⭐ 100</div>
+        </div>
+        <button class="nav-logout" onclick="handleLogout()" title="Switch Captain or Depart Harbor"><span>🚪</span><span>Switch Captain</span></button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Bottom Dock Nav -->
+  <div class="dock-nav">
+    <div class="dock-blur"></div>
+    <button class="dk active" id="mNavDash" onclick="showView('dashboard')"><span>⚓</span><small>Harbor</small></button>
+    <button class="dk" id="mNavBook" onclick="showView('book')"><span>📋</span><small>Book</small></button>
+    <button class="dk" id="mNavHistory" onclick="showView('history')"><span>📜</span><small>Log</small></button>
+    <button class="dk hidden" id="mNavAdmin" onclick="showView('admin')"><span>🏛</span><small>Admin</small></button>
+    <button class="dk" onclick="openRouletteModal()"><span>🎡</span><small>Fortune</small></button>
+    <button class="dk" onclick="handleLogout()"><span>🚪</span><small>Leave</small></button>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!-- VIEW 1: DASHBOARD (HARBOR & 3D INTERACTIVE STAGE)             -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div id="viewDashboard" class="view active-view">
+
+    <!-- LIVE HARBOR CONDITIONS TICKER BAR -->
+    <div class="harbor-ticker-bar">
+      <div class="htb-item">
+        <span class="htb-dot pulse-green"></span>
+        <span class="htb-label">Port Status:</span>
+        <strong class="htb-val">Aqua Laguna Calm (Gates Open)</strong>
+      </div>
+      <div class="htb-item">
+        <span class="htb-icon">🚢</span>
+        <span class="htb-label">Mooring Capacity:</span>
+        <strong class="htb-val" id="tickerCapacity">10 / 12 Berths Available</strong>
+      </div>
+      <div class="htb-item">
+        <span class="htb-icon">🛡️</span>
+        <span class="htb-label">Harbor Security:</span>
+        <strong class="htb-val">Galley-La Dock 1 Peace Accord Active</strong>
+      </div>
+      <div class="htb-item htb-clock">
+        <span class="htb-icon">⏱️</span>
+        <span class="htb-label">Grand Line Time:</span>
+        <strong class="htb-val" id="liveGrandLineClock">--:--:--</strong>
+      </div>
+    </div>
+
+    <!-- CINEMATIC 3D HERO SECTION -->
+    <section class="cinematic-hero">
+      <div class="ch-bg" style="background-image:url('assets/water7_fountain.png')"></div>
+      <div class="ch-overlay"></div>
+      <div class="ch-scanlines"></div>
+      <div class="ch-speedburst" id="chSpeedBurst"></div>
+
+      <!-- Three.js 3D WebGL Canvas (Water & Floating 3D Ship) -->
+      <canvas id="three3dStage" class="three-3d-stage"></canvas>
+
+      <!-- 3D INTERACTIVE CHARACTERS WITH REAL-TIME EYE & HEAD TRACKING -->
+      <div class="ch-characters" id="chCharacters3D">
+        
+        <!-- Zoro (Left 3D Rig) -->
+        <div class="ch-char-rig ch-char-l" id="charRigZoro" onclick="triggerCharQuote('zoro')">
+          <div class="char-3d-card" id="cardZoro">
+            <div class="char-3d-art" style="background-image:url('assets/zoro_aura.png')">
+              <!-- Interactive 3D Eye Pupil -->
+              <div class="char-eye-container eye-zoro">
+                <div class="char-pupil" id="pupilZoro"></div>
+              </div>
+            </div>
+            <div class="char-blade-glow"></div>
+            <div class="char-sheen"></div>
+            <div class="char-speech-bubble font-pirate" id="speechZoro">"Nothing happened..."</div>
+            <div class="char-info-plate">
+              <div class="cip-bounty">฿ 1,111,000,000</div>
+              <div class="cip-name font-pirate">RORONOA ZORO</div>
+              <div class="cip-title font-heading">Dockmaster Swordsman · Berth Enforcer</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Luffy (Right 3D Rig) -->
+        <div class="ch-char-rig ch-char-r" id="charRigLuffy" onclick="triggerCharQuote('luffy')">
+          <div class="char-3d-card" id="cardLuffy">
+            <div class="char-3d-art" style="background-image:url('assets/luffy_hero.png')">
+              <!-- Interactive 3D Eye Pupils -->
+              <div class="char-eye-container eye-luffy-left">
+                <div class="char-pupil" id="pupilLuffyL"></div>
+              </div>
+              <div class="char-eye-container eye-luffy-right">
+                <div class="char-pupil" id="pupilLuffyR"></div>
+              </div>
+            </div>
+            <div class="char-sun-glow"></div>
+            <div class="char-sheen"></div>
+            <div class="char-speech-bubble font-pirate" id="speechLuffy">"I'm gonna be King of the Pirates!"</div>
+            <div class="char-info-plate">
+              <div class="cip-bounty">฿ 3,000,000,000</div>
+              <div class="cip-name font-pirate">MONKEY D. LUFFY</div>
+              <div class="cip-title font-heading">Fleet Admiral · Dock 1 Commander</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero Center Content -->
+      <div class="ch-content">
+        <div class="hero-top-pill">
+          <span class="htp-dot"></span>
+          <span class="htp-text font-heading">GRAND LINE FLEET ANCHORAGE</span>
+          <span class="htp-tag font-pirate">DOCKS 1-12</span>
+        </div>
+
+        <h1 class="ch-main-title font-pirate" id="heroGreeting">Water 7 Docking Authority</h1>
+        <div class="ch-sub-badge font-heading">GALLEY-LA SHIPYARDS · OFFICIAL MOORINGS & SHIPWRIGHT BERTHS</div>
+        
+        <!-- Pirate Scroll Quote Box -->
+        <div class="hero-parchment-quote">
+          <div class="hpq-badge font-pirate">MAYOR ICEBURG SPEAKS</div>
+          <p class="hpq-text font-lore">
+            "Wealth, Fame, Power... Welcome to Water 7, the City of Water. 
+            Moor your vessel at our Adam Wood quays, secure skilled Franky Family repairs, 
+            and sail the Grand Line without fear of berth conflicts or duel disputes!"
+          </p>
+        </div>
+
+        <!-- Live Harbor Fleet Stats Counters -->
+        <div class="ch-stats-row">
+          <div class="ch-stat cs-green">
+            <div class="cs-val font-pirate" id="statAvail">--</div>
+            <div class="cs-label">Available Berths</div>
+          </div>
+          <div class="ch-stat cs-red">
+            <div class="cs-val font-pirate" id="statBooked">--</div>
+            <div class="cs-label">Occupied Slips</div>
+          </div>
+          <div class="ch-stat cs-gold">
+            <div class="cs-val font-pirate">12</div>
+            <div class="cs-label">Total Water 7 Docks</div>
+          </div>
+          <div class="ch-stat cs-teal">
+            <div class="cs-val font-pirate" id="myScore">--</div>
+            <div class="cs-label">My Reliability Score</div>
+          </div>
+        </div>
+
+        <!-- Primary CTA Buttons -->
+        <div class="ch-cta-row">
+          <button class="ch-cta-book font-pirate" onclick="showView('book')">
+            <span>⚓</span> Reserve Berth Slip
+          </button>
+          <button class="ch-cta-checkin font-pirate" onclick="openCheckinModal()">
+            <span>✅</span> Check In to Dock
+          </button>
+          <button class="ch-cta-roulette font-pirate" onclick="openRouletteModal()">
+            <span>🎡</span> Grand Line Fortune
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- CAPTAIN'S QUARTERDECK / COMMAND BRIDGE CARD                 -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="app-section" style="padding-bottom:0;padding-top:20px">
+      <div class="captain-bridge-card" id="captainBridge">
+        <div class="cbc-left">
+          <div class="cbc-avatar" id="cbcAvatar">L</div>
+          <div>
+            <div class="cbc-tag font-pirate">⚓ CAPTAIN'S QUARTERDECK · FLEET FLAGSHIP</div>
+            <h2 class="cbc-name font-pirate" id="cbcCaptainName">Captain Monkey D. Luffy</h2>
+            <p class="cbc-sub" id="cbcShipInfo">Flagship: Galleon (Thousand Sunny) · Standing: ⭐ 100 Legendary Yonko</p>
+          </div>
+        </div>
+        <div class="cbc-actions">
+          <button class="btn-fast-book font-pirate" onclick="fastTrackBooking()">
+            <span>⚓</span> Fast-Track Mooring Slip
+          </button>
+          <button class="btn-quick-checkin font-pirate" onclick="openCheckinModal()">
+            <span>✅</span> Express Check-In
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <section class="app-section" style="padding-top:12px;">
+      <div class="post-login-portal">
+        <div class="portal-card portal-primary">
+          <span class="portal-kicker font-heading">Harbor Control</span>
+          <strong class="font-pirate">Live Dock Status</strong>
+          <p>Monitor berth availability, check-in windows, and real-time vessel traffic across Water 7.</p>
+        </div>
+        <div class="portal-card">
+          <span class="portal-kicker font-heading">Dock Ops</span>
+          <strong class="font-pirate">Fast Booking</strong>
+          <p>Reserve moorings, adjust times, and keep your fleet synchronized with the harbor ledger.</p>
+        </div>
+        <div class="portal-card">
+          <span class="portal-kicker font-heading">Crew Tools</span>
+          <strong class="font-pirate">Sound & Sync</strong>
+          <p>Use the sea waves, SFX, and backend sync controls to keep the shipyard active and connected.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- WATER 7 HARBOR MANIFESTO & 3D WANTED POSTER SECTION         -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="app-section wanted-ps-section">
+      <div class="wanted-ps-grid">
+        
+        <!-- Left: Authentic Water 7 Harbor Protocols Manifesto -->
+        <div class="ps01-card-parchment">
+          <div class="ps01-ribbon font-pirate">GALLEY-LA OFFICIAL CHARTER</div>
+          <div class="ps01-header">
+            <span class="ps01-badge font-heading">WATER 7</span>
+            <span class="ps01-domain font-heading">Harbor Navigation & Port Protocols</span>
+          </div>
+          <h2 class="ps01-title font-pirate">Water 7 Harbor Manifesto & Mooring Protocols</h2>
+          <p class="ps01-desc">
+            The Galley-La Company guarantees tamper-proof berth allocations across all 12 premier docks. 
+            Pirate captains and naval fleets can reserve designated quays, verify vessel clearances, 
+            and maintain spotless reputation standing across the Grand Line.
+          </p>
+
+          <!-- Core Harbor Features Grid -->
+          <div class="manifesto-features-grid">
+            <div class="mf-item">
+              <span class="mf-icon">🔒</span>
+              <div>
+                <strong class="font-heading">Automated Conflict Prevention</strong>
+                <p>Advanced slot reservations ensure no two crews ever dispute the same slip at Dock 1.</p>
+              </div>
+            </div>
+            <div class="mf-item">
+              <span class="mf-icon">🌳</span>
+              <div>
+                <strong class="font-heading">Adam Wood Quays & Cola Refueling</strong>
+                <p>Mooring slips equipped for Thousand Sunny cola pumps and heavy warship battle repairs.</p>
+              </div>
+            </div>
+            <div class="mf-item">
+              <span class="mf-icon">🌊</span>
+              <div>
+                <strong class="font-heading">Aqua Laguna Storm Gates</strong>
+                <p>Automated harbor floodgates seal all moored vessels during high-tide sea surges.</p>
+              </div>
+            </div>
+            <div class="mf-item">
+              <span class="mf-icon">🐌</span>
+              <div>
+                <strong class="font-heading">Den Den Mushi Arrival Network</strong>
+                <p>Direct radio check-in pass issued upon approaching Water 7 outer waters.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="ps01-theme-note">
+            <strong class="font-pirate">⚓ Port Authority Guarantee:</strong> Punctual mooring secures top Yonko reliability standing with Mayor Iceburg.
+          </div>
+        </div>
+
+        <!-- Right: 3D Interactive Wanted Poster of Gol D. Roger & Straw Hat Crew -->
+        <div class="wanted-poster-interactive" id="wantedPoster3D">
+          <div class="wanted-card-inner">
+            <div class="wanted-top-header font-heading">WANTED</div>
+            <div class="wanted-poster-art">
+              <img src="assets/strawhat_treasure.jpg" class="wanted-poster-img" alt="Straw Hat Crew & Thousand Sunny Treasure"/>
+              <div class="wanted-name-tag font-pirate">GOL D. ROGER & STRAW HAT CREW</div>
+            </div>
+            <div class="wanted-dead-alive font-pirate">DEAD OR ALIVE</div>
+            <div class="wanted-bounty font-heading">฿ 1,500,000,000-</div>
+            <div class="wanted-footer font-heading">MARINE REWARD • WATER 7 GRAND BOUNTY</div>
+            <div class="wanted-stamp">VERIFIED</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- QUICK ACTIONS SECTION                                       -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="app-section">
+      <div class="section-heading">
+        <div class="sh-accent"></div>
+        <h2 class="sh-title font-pirate">⚡ Grand Line Quick Actions</h2>
+      </div>
+      <div class="qa-manga-grid">
+        <div class="qa-manga-card" onclick="showView('book')" data-color="#f5c518">
+          <div class="qam-panel-lines"></div>
+          <div class="qam-icon">📋</div>
+          <div class="qam-label font-pirate">Book Berth</div>
+          <div class="qam-sub">Reserve your slip at Dock 1</div>
+          <div class="qam-corner-fold"></div>
+        </div>
+        <div class="qa-manga-card" onclick="openCheckinModal()" data-color="#10b981">
+          <div class="qam-panel-lines"></div>
+          <div class="qam-icon">✅</div>
+          <div class="qam-label font-pirate">Check In</div>
+          <div class="qam-sub">Confirm vessel arrival</div>
+          <div class="qam-corner-fold"></div>
+        </div>
+        <div class="qa-manga-card" onclick="showView('history')" data-color="#8b5cf6">
+          <div class="qam-panel-lines"></div>
+          <div class="qam-icon">📜</div>
+          <div class="qam-label font-pirate">Voyage Log</div>
+          <div class="qam-sub">Inspect past reservations</div>
+          <div class="qam-corner-fold"></div>
+        </div>
+        <div class="qa-manga-card" onclick="openCancelFromDash()" data-color="#ef4444">
+          <div class="qam-panel-lines"></div>
+          <div class="qam-icon">❌</div>
+          <div class="qam-label font-pirate">Cancel Reservation</div>
+          <div class="qam-sub">Free berth for other crews</div>
+          <div class="qam-corner-fold"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SHIP CLASSIFICATION & FLEET GUIDE                           -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="app-section">
+      <div class="fleet-guide-banner" style="background-image:url('assets/pirate_ship_ocean.png')">
+        <div class="fgb-overlay"></div>
+        <div class="fgb-content">
+          <div class="fgb-tag font-heading">GRAND LINE SHIP CLASSIFICATION</div>
+          <h2 class="fgb-title font-pirate">Water 7 Dock Capacity & Ship Sizes</h2>
+          <p class="fgb-sub">Every slip at Galley-La is engineered with Adam Wood timber to dock specific vessel classes.</p>
+          
+          <div class="ship-classes-row">
+            <div class="sc-card">
+              <span class="sc-icon">🛶</span>
+              <h3 class="font-pirate">Sloop (Small)</h3>
+              <p>Going Merry, Caravel, swift skiffs. Quick docking at Docks 1, 4, 7, 9, 12.</p>
+            </div>
+            <div class="sc-card">
+              <span class="sc-icon">⛵</span>
+              <h3 class="font-pirate">Galleon (Medium)</h3>
+              <p>Thousand Sunny, Red Force, flagships. Reserved at Docks 2, 5, 8, 11.</p>
+            </div>
+            <div class="sc-card">
+              <span class="sc-icon">🚢</span>
+              <h3 class="font-pirate">Marine Warship (Heavy)</h3>
+              <p>Battleships & iron-clads. Reinforced quays at Docks 3, 6, 10.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- BERTH GRID SECTION (DOCKS 1-12)                             -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="app-section">
+      <div class="section-heading">
+        <div class="sh-accent"></div>
+        <h2 class="sh-title font-pirate">⚓ Water 7 Berth Grid — Live Harbor Status</h2>
+        <div class="sh-legend">
+          <span><span class="leg-dot ld-green"></span>Available</span>
+          <span><span class="leg-dot ld-red"></span>Occupied</span>
+          <span><span class="leg-dot ld-teal"></span>Checked In</span>
+          <span><span class="leg-dot ld-gold"></span>My Booking</span>
+        </div>
+      </div>
+      
+      <!-- Berth Filters -->
+      <div class="berth-filter-row">
+        <button class="bf active" onclick="filterBerths('all',this)">All 12 Berths</button>
+        <button class="bf" onclick="filterBerths('Sloop',this)">🛶 Sloop Only</button>
+        <button class="bf" onclick="filterBerths('Galleon',this)">⛵ Galleon Only</button>
+        <button class="bf" onclick="filterBerths('Marine Warship',this)">🚢 Warship Only</button>
+        <button class="bf" onclick="filterBerths('available',this)">✅ Free Now</button>
+      </div>
+
+      <div class="berth-manga-grid" id="berthGrid"></div>
+    </section>
+
+    <!-- ACTIVE RESERVATION & COUNTDOWN -->
+    <section class="app-section" id="activeBookingSection" style="display:none">
+      <div class="section-heading">
+        <div class="sh-accent"></div>
+        <h2 class="sh-title font-pirate">⏳ Active Berth Reservation & Arrival Window</h2>
+      </div>
+      <div id="activeBookingCard" class="active-manga-card"></div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- CREW RELIABILITY SCORE SHOWCASE (WITH ZORO SMILE ART)        -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section class="app-section">
+      <div class="score-manga-card" id="scoreShowcase">
+        <div class="smc-art-side" style="background-image:url('assets/zoro_smile.png')">
+          <div class="smc-art-overlay"></div>
+          <div class="smc-art-badge font-pirate">PIRATE REPUTATION</div>
+        </div>
+        
+        <div class="smc-left">
+          <div class="smc-title font-pirate">⭐ Crew Reliability Score & Karma</div>
+          <div class="smc-desc font-lore">
+            "A captain's word is their bond on the Grand Line. Punctual dockings earn Golden Berries; 
+            no-shows and late cancellations lower your bounty standing."
+          </div>
+          <div class="smc-breakdown" id="scoreBreakdown"></div>
+        </div>
+
+        <div class="smc-right">
+          <div class="smc-ring-wrap">
+            <svg class="smc-svg" viewBox="0 0 120 120">
+              <circle class="smc-track" cx="60" cy="60" r="50"/>
+              <circle class="smc-arc" cx="60" cy="60" r="50" id="scoreProgressCircle"/>
+            </svg>
+            <div class="smc-inner">
+              <div class="smc-val font-pirate" id="scoreValue">100</div>
+              <div class="smc-max">/100</div>
+            </div>
+          </div>
+          <div class="smc-rank font-pirate" id="scoreRank">⭐ Legendary Yonko</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STRAW HAT CREW MANIFESTO BANNER -->
+    <section class="crew-band-section">
+      <div class="crew-img-wrap">
+        <img src="assets/crew.jpg" class="crew-band-img" alt="Straw Hat Pirates Crew"/>
+        <div class="crew-band-overlay">
+          <h2 class="crew-band-title font-pirate">ALL PIRATE FLEETS WELCOME AT WATER 7</h2>
+          <p class="crew-band-sub">Iceburg's automated dock slips prevent conflicts, duels, and wasted berths on the Grand Line.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!-- VIEW 2: BOOK BERTH (3-STEP INTERACTIVE RESERVATION WIZARD)   -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div id="viewBook" class="view hidden-view">
+    <div class="book-hero">
+      <div class="bh-bg" style="background-image:url('assets/water7_fountain.png')"></div>
+      <div class="bh-overlay"></div>
+      <div class="bh-content">
+        <h2 class="bh-title font-pirate">📋 Reserve a Berth Slip</h2>
+        <p class="bh-sub">Mayor Iceburg's 100% Conflict-Free Grand Line Mooring System · Instant Clearance</p>
+      </div>
+    </div>
+
+    <section class="app-section">
+      <div class="booking-wizard-container">
+        
+        <!-- Step Progress Tabs Bar -->
+        <div class="booking-steps-bar">
+          <div class="b-step active" id="bStep1Tab" onclick="goToBookingStep(1)">
+            <span class="bs-num">1</span>
+            <div class="bs-info">
+              <span class="bs-title font-pirate">Vessel Class</span>
+              <span class="bs-desc" id="bsDescVessel">Select Ship Draft</span>
+            </div>
+          </div>
+          <div class="b-step-line"></div>
+          <div class="b-step" id="bStep2Tab" onclick="goToBookingStep(2)">
+            <span class="bs-num">2</span>
+            <div class="bs-info">
+              <span class="bs-title font-pirate">Mooring Window</span>
+              <span class="bs-desc" id="bsDescTime">Choose Tide Preset</span>
+            </div>
+          </div>
+          <div class="b-step-line"></div>
+          <div class="b-step" id="bStep3Tab" onclick="goToBookingStep(3)">
+            <span class="bs-num">3</span>
+            <div class="bs-info">
+              <span class="bs-title font-pirate">Select Slip</span>
+              <span class="bs-desc" id="bsDescSlip">Conflict-Free Berth</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 1: Vessel Class Selection -->
+        <div class="booking-step-section" id="bookingStep1">
+          <div class="step-header">
+            <span class="sh-step-badge font-pirate">STEP 1 OF 3</span>
+            <h3 class="sh-step-title font-pirate">Select Your Vessel Class</h3>
+            <p class="sh-step-sub">Water 7 quays are engineered for specific draft, Adam Wood timber, and mooring dimensions</p>
+          </div>
+          <div class="vessel-selector-cards">
+            <div class="vessel-card active" id="vCardSloop" onclick="selectVesselClass('Sloop')">
+              <div class="vc-badge font-heading">SMALL DRAFT</div>
+              <div class="vc-icon">🛶</div>
+              <h4 class="font-pirate">Sloop</h4>
+              <p class="vc-specs">Up to 25m · Going Merry / Mini Merry / Skiffs</p>
+              <div class="vc-docks">Dedicated Docks: 1, 4, 7, 9, 12</div>
+              <div class="vc-check">✔ Active Vessel Selection</div>
+            </div>
+            <div class="vessel-card" id="vCardGalleon" onclick="selectVesselClass('Galleon')">
+              <div class="vc-badge font-heading">MEDIUM FLAGSHIP</div>
+              <div class="vc-icon">⛵</div>
+              <h4 class="font-pirate">Galleon</h4>
+              <p class="vc-specs">Up to 60m · Thousand Sunny / Red Force</p>
+              <div class="vc-docks">Dedicated Docks: 2, 5, 8, 11</div>
+              <div class="vc-check">✔ Active Vessel Selection</div>
+            </div>
+            <div class="vessel-card" id="vCardWarship" onclick="selectVesselClass('Marine Warship')">
+              <div class="vc-badge font-heading">HEAVY BATTLESHIP</div>
+              <div class="vc-icon">🚢</div>
+              <h4 class="font-pirate">Marine Warship</h4>
+              <p class="vc-specs">Up to 120m · Buster Call Iron-Clad Battleships</p>
+              <div class="vc-docks">Dedicated Docks: 3, 6, 10</div>
+              <div class="vc-check">✔ Active Vessel Selection</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2: Date & Tide Window Presets -->
+        <div class="booking-step-section" id="bookingStep2">
+          <div class="step-header">
+            <span class="sh-step-badge font-pirate">STEP 2 OF 3</span>
+            <h3 class="sh-step-title font-pirate">Select Mooring Date & Tide Window</h3>
+            <p class="sh-step-sub">Pick an instant 1-click tide window with guaranteed non-overlapping slot clearance</p>
+          </div>
+          
+          <!-- Quick Date Selection Row -->
+          <div class="date-preset-row">
+            <span class="dpr-label font-heading">Quick Date:</span>
+            <button class="date-pill active" id="dpToday" onclick="selectQuickDate('today')">📅 Today</button>
+            <button class="date-pill" id="dpTomorrow" onclick="selectQuickDate('tomorrow')">🌅 Tomorrow</button>
+            <button class="date-pill" id="dpDayAfter" onclick="selectQuickDate('dayAfter')">⛵ In 2 Days</button>
+            <div class="custom-date-wrap">
+              <span class="cdw-icon">📅</span>
+              <input type="date" id="bookDate" onchange="onBookingDateTimeChange()"/>
+            </div>
+          </div>
+
+          <!-- 1-Click Tide Window Presets -->
+          <div class="tide-presets-grid">
+            <div class="tide-preset-btn active" id="presetMorning" onclick="selectTimePreset('08:00', '12:00', 'Morning Tide', this)">
+              <div class="tpb-icon">🌅</div>
+              <div class="tpb-name font-pirate">Morning Tide</div>
+              <div class="tpb-hours">08:00 – 12:00 (4 hrs)</div>
+              <div class="tpb-status font-heading" id="tpbAvailMorning">🟢 Open Slips</div>
+            </div>
+            <div class="tide-preset-btn" id="presetMidday" onclick="selectTimePreset('12:00', '16:00', 'Midday Sun', this)">
+              <div class="tpb-icon">☀️</div>
+              <div class="tpb-name font-pirate">Midday Sun</div>
+              <div class="tpb-hours">12:00 – 16:00 (4 hrs)</div>
+              <div class="tpb-status font-heading" id="tpbAvailMidday">🟢 Open Slips</div>
+            </div>
+            <div class="tide-preset-btn" id="presetSunset" onclick="selectTimePreset('16:00', '20:00', 'Twilight Port', this)">
+              <div class="tpb-icon">🌆</div>
+              <div class="tpb-name font-pirate">Twilight Port</div>
+              <div class="tpb-hours">16:00 – 20:00 (4 hrs)</div>
+              <div class="tpb-status font-heading" id="tpbAvailSunset">🟢 Open Slips</div>
+            </div>
+            <div class="tide-preset-btn" id="presetFullDay" onclick="selectTimePreset('08:00', '20:00', 'Full Day Mooring', this)">
+              <div class="tpb-icon">⚓</div>
+              <div class="tpb-name font-pirate">Full Day Mooring</div>
+              <div class="tpb-hours">08:00 – 20:00 (12 hrs)</div>
+              <div class="tpb-status font-heading" id="tpbAvailFullDay">🟢 Open Slips</div>
+            </div>
+            <div class="tide-preset-btn" id="presetCustom" onclick="toggleCustomTime(this)">
+              <div class="tpb-icon">⚙️</div>
+              <div class="tpb-name font-pirate">Custom Hours</div>
+              <div class="tpb-hours">Choose Custom Time</div>
+              <div class="tpb-status font-heading">Clock In/Out</div>
+            </div>
+          </div>
+
+          <!-- Custom Time Inputs (hidden by default) -->
+          <div id="customTimeInputs" class="custom-time-panel hidden">
+            <div class="input-row-2">
+              <div class="input-field">
+                <span class="if-icon">🕐</span>
+                <label>Arrival Time:</label>
+                <input type="time" id="bookTimeStart" value="16:00" onchange="onBookingDateTimeChange()"/>
+              </div>
+              <div class="input-field">
+                <span class="if-icon">🕓</span>
+                <label>Departure Time:</label>
+                <input type="time" id="bookTimeEnd" value="20:00" onchange="onBookingDateTimeChange()"/>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: Available Berth Map & Instant Confirmation -->
+        <div class="booking-step-section" id="bookingStep3">
+          <div class="step-header-with-actions">
+            <div>
+              <span class="sh-step-badge font-pirate">STEP 3 OF 3</span>
+              <h3 class="sh-step-title font-pirate">Choose Your Designated Slip</h3>
+              <p class="sh-step-sub">Select any green slip or click Auto-Assign to have Iceburg lock the premier berth</p>
+            </div>
+            <button class="btn-auto-assign font-pirate" onclick="autoSelectBestBerth()">
+              <span>✨</span> Auto-Assign Best Free Slip
+            </button>
+          </div>
+
+          <!-- Toolbar: Legend & Free Count -->
+          <div class="booking-grid-toolbar">
+            <div class="bgt-legend">
+              <span class="bgt-item"><span class="leg-dot ld-green"></span> 100% Free & Ready to Moor</span>
+              <span class="bgt-item"><span class="leg-dot ld-gold"></span> Selected Slip</span>
+              <span class="bgt-item"><span class="leg-dot ld-red"></span> Occupied by Other Fleet</span>
+            </div>
+            <div class="bgt-count" id="bookFreeCount">Showing available slips…</div>
+          </div>
+
+          <!-- Visual Berth Grid -->
+          <div class="book-manga-berth-grid" id="bookBerthGrid"></div>
+
+          <!-- Live Voyage Clearance Manifest Card -->
+          <div class="voyage-manifest-card" id="voyageManifest">
+            <div class="vm-header">
+              <div class="vm-badge font-pirate">⚓ OFFICIAL WATER 7 DOCK CLEARANCE PASS</div>
+              <div class="vm-guarantee" id="vmGuarantee">🔒 100% Conflict-Free Mooring Guaranteed</div>
+            </div>
+            <div class="vm-body" id="vmBody">
+              <div class="vm-grid">
+                <div class="vm-col">
+                  <div class="vm-label">Designated Berth:</div>
+                  <div class="vm-val font-pirate" id="vmBerthName">Please select an available slip above</div>
+                </div>
+                <div class="vm-col">
+                  <div class="vm-label">Captain & Flagship:</div>
+                  <div class="vm-val font-heading" id="vmCaptainShip">--</div>
+                </div>
+                <div class="vm-col">
+                  <div class="vm-label">Mooring Window:</div>
+                  <div class="vm-val font-heading" id="vmTimeWindow">--</div>
+                </div>
+                <div class="vm-col">
+                  <div class="vm-label">Harbor Mooring Tariff:</div>
+                  <div class="vm-val font-pirate" style="color:var(--emerald)">0 Berries (Free Mayor Pass)</div>
+                </div>
+              </div>
+
+              <div class="fortune-slip-box" style="margin-top:16px; border:1px solid rgba(245,197,24,0.25); border-radius:14px; padding:12px 14px; background:rgba(245,197,24,0.05);">
+                <div class="vm-label" style="margin-bottom:6px">Grand Line Fortune</div>
+                <div class="vm-val font-pirate" id="fortuneSlipBadge" style="color:var(--gold); font-size:0.9rem;">🎡 Fortune: No result yet</div>
+                <div class="vm-val" id="fortuneSlipNote" style="font-size:0.8rem; color:var(--t200); margin-top:6px;">Spin the Grand Line wheel to reveal your harbor boon.</div>
+              </div>
+
+              <div id="customerReceiptSlip" class="receipt-slip-card" style="margin-top:16px;"></div>
+
+              <div class="input-field" style="margin-top:16px">
+                <span class="if-icon">📝</span>
+                <input type="text" id="bookNotes" placeholder="Captain's notes (Cargo type, Cola pump request, Franky repair needed)…"/>
+                <div class="if-line"></div>
+              </div>
+
+              <div id="bookConflictMsg" class="manga-alert conflict-alert hidden">
+                ⚠️ Scheduling Conflict! This berth is already booked during your selected time window.
+              </div>
+              <div id="bookSuccessMsg" class="manga-alert success-alert hidden">
+                ✅ Berth successfully reserved! Den Den Mushi transmission sent!
+              </div>
+
+              <button class="btn-manga-primary btn-confirm-massive" onclick="createBooking()" id="confirmBookBtn" disabled>
+                <span class="bmp-bg"></span><span class="bmp-shine"></span>
+                <span class="bmp-text font-pirate">⚓ Confirm & Lock Berth Reservation</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!-- VIEW 3: VOYAGE LOG & BOOKING HISTORY                        -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div id="viewHistory" class="view hidden-view">
+    <div class="book-hero">
+      <div class="bh-bg" style="background-image:url('assets/strawhat_treasure.jpg')"></div>
+      <div class="bh-overlay"></div>
+      <div class="bh-content">
+        <h2 class="bh-title font-pirate">📜 Grand Line Voyage Log</h2>
+        <p class="bh-sub">Complete chronological docking history, check-in timestamps, and reputation audits</p>
+      </div>
+    </div>
+
+    <section class="app-section">
+      <div class="hf-row">
+        <button class="hf active" onclick="filterHistory('all',this)">All Voyages</button>
+        <button class="hf" onclick="filterHistory('confirmed',this)">⏳ Confirmed</button>
+        <button class="hf" onclick="filterHistory('checked_in',this)">✅ Checked In</button>
+        <button class="hf" onclick="filterHistory('cancelled',this)">❌ Cancelled</button>
+        <button class="hf" onclick="filterHistory('no_show',this)">🚫 No-Show</button>
+        <button class="hf" onclick="filterHistory('completed',this)">🏆 Completed</button>
+      </div>
+      <div class="history-manga-list" id="historyList"></div>
+    </section>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!-- VIEW 4: ADMIN CONTROL ROOM (DOCKMASTER ICEBURG)              -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div id="viewAdmin" class="view hidden-view">
+    <div class="book-hero">
+      <div class="bh-bg" style="background-image:url('assets/luffy_gear5.png')"></div>
+      <div class="bh-overlay" style="background:linear-gradient(135deg,rgba(2,8,16,0.92),rgba(10,22,40,0.8))"></div>
+      <div class="bh-content">
+        <h2 class="bh-title font-pirate">🏛 Dockmaster Central Command</h2>
+        <p class="bh-sub">Iceburg's comprehensive Water 7 fleet management, berth utilization, and no-show audit</p>
+      </div>
+    </div>
+
+    <section class="app-section">
+      <!-- Live Metrics Cards -->
+      <div class="admin-manga-stats" id="adminStatsGrid"></div>
+
+      <!-- Charts Row -->
+      <div class="admin-charts-row">
+        <div class="manga-chart-card">
+          <h3 class="mcc-title font-pirate">📊 Fleet Reservation Status</h3>
+          <div class="pie-wrap">
+            <canvas id="statusChart" width="220" height="220"></canvas>
+            <div id="pieLegend" class="pie-legend"></div>
+          </div>
+        </div>
+        <div class="manga-chart-card">
+          <h3 class="mcc-title font-pirate">🚢 Berth Usage by Ship Class</h3>
+          <div id="shipBarChart" class="bar-chart-wrap"></div>
+        </div>
+      </div>
+
+      <!-- All Reservations Table -->
+      <div class="admin-manga-table">
+        <div class="amt-header">
+          <h3 class="font-pirate">📋 All Fleet Reservations</h3>
+          <div class="input-field" style="width:260px">
+            <span class="if-icon">🔍</span>
+            <input type="text" id="adminSearch" placeholder="Search by captain, berth, ship…" oninput="renderAdminTable()"/>
+            <div class="if-line"></div>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="manga-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Captain</th>
+                <th>Berth</th>
+                <th>Ship Class</th>
+                <th>Date</th>
+                <th>Slot Time</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Captains Registry -->
+      <div class="admin-manga-table">
+        <h3 class="font-pirate">👥 Registered Fleet Captains & Reliability Karma</h3>
+        <div class="table-scroll">
+          <table class="manga-table">
+            <thead>
+              <tr>
+                <th>Call Sign</th>
+                <th>Captain Name</th>
+                <th>Flagship</th>
+                <th>Karma Score</th>
+                <th>Total Bookings</th>
+                <th>No-Shows</th>
+                <th>Cancellations</th>
+              </tr>
+            </thead>
+            <tbody id="adminUsersBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Incident & No-Show Log -->
+      <div class="admin-manga-table">
+        <h3 class="font-pirate">🚫 Harbor Incident & No-Show Audit Log</h3>
+        <div class="table-scroll">
+          <table class="manga-table">
+            <thead>
+              <tr>
+                <th>Date & Time</th>
+                <th>Captain</th>
+                <th>Berth</th>
+                <th>Incident Type</th>
+                <th>Karma Impact</th>
+              </tr>
+            </thead>
+            <tbody id="adminNoshowBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- MODAL: DOCK CHECK-IN                                           -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="manga-modal-overlay" id="checkinModal" style="display:none">
+  <div class="manga-modal">
+    <div class="mm-header">
+      <h3 class="font-pirate">✅ Water 7 Dock Check-In Pass</h3>
+      <button class="mm-close" onclick="closeModal('checkinModal')">✕</button>
+    </div>
+    <div id="checkinModalBody" class="mm-body"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- MODAL: CANCEL RESERVATION                                      -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="manga-modal-overlay" id="cancelModal" style="display:none">
+  <div class="manga-modal">
+    <div class="mm-header">
+      <h3 class="font-pirate">❌ Relinquish Berth Slip</h3>
+      <button class="mm-close" onclick="closeModal('cancelModal')">✕</button>
+    </div>
+    <div id="cancelModalBody" class="mm-body"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- MODAL: OCCUPIED BERTH CONFLICT HELPER & SMART SUGGESTIONS      -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="manga-modal-overlay" id="berthOccupancyModal" style="display:none">
+  <div class="manga-modal">
+    <div class="mm-header">
+      <h3 class="font-pirate">⚓ Berth Occupancy & Free Slots</h3>
+      <button class="mm-close" onclick="closeModal('berthOccupancyModal')">✕</button>
+    </div>
+    <div id="berthOccupancyModalBody" class="mm-body"></div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- MODAL: GRAND LINE DESTINY ROULETTE MINI-GAME                  -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="manga-modal-overlay" id="rouletteModal" style="display:none">
+  <div class="manga-modal roulette-modal-custom">
+    <div class="mm-header">
+      <h3 class="font-pirate">🎡 Grand Line Wheel of Fortune</h3>
+      <button class="mm-close" onclick="closeModal('rouletteModal')">✕</button>
+    </div>
+    <div class="mm-body text-center">
+      <p class="font-lore roulette-sub">
+        "Spin the Wheel of Fortune! Random Grand Line weather, berth perks, and pirate bounties await your fleet!"
+      </p>
+      
+      <!-- Interactive Spinning Roulette Wheel Canvas -->
+      <div class="roulette-wheel-container">
+        <canvas id="rouletteCanvas" width="340" height="340"></canvas>
+        <div class="roulette-pointer">▼</div>
+      </div>
+
+      <div class="roulette-controls">
+        <button class="btn-manga-primary spin-btn" id="btnSpinRoulette" onclick="spinDestinyWheel()">
+          <span class="bmp-text font-pirate">🎡 Spin the Wheel of Fate</span>
+        </button>
+      </div>
+
+      <div id="rouletteResult" class="roulette-result-card hidden">
+        <div class="rrc-badge font-heading" id="rrBadge">DESTINY REVEALED</div>
+        <h4 class="font-pirate" id="rrTitle">--</h4>
+        <p id="rrDesc">--</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOASTS CONTAINER -->
+<div class="toast-wrap" id="toastContainer"></div>
+
+<!-- DEN DEN MUSHI AUDIO TRANSMISSION NOTIFIER -->
+<div class="denden-wrap hidden" id="dendenAlert">
+  <div class="denden-card">
+    <div class="denden-pulse-ring r1"></div>
+    <div class="denden-pulse-ring r2"></div>
+    <div class="denden-snail-box"><span class="denden-snail">🐌</span></div>
+    <div class="denden-body">
+      <div class="denden-brand font-heading">📻 Den Den Mushi · Water 7 Transceiver</div>
+      <div class="denden-msg" id="dendenMsg">Incoming transmission…</div>
+    </div>
+    <button class="denden-x" onclick="closeDenden()">✕</button>
+  </div>
+</div>
+
+<!-- Main Application JS -->
+<script src="app.js"></script>
+</body>
+</html>

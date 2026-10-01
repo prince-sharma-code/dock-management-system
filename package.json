@@ -1,0 +1,29 @@
+{
+  "name": "nexasoul-port-logistics",
+  "version": "1.0.0",
+  "description": "Galley-La DockMaster backend and static frontend for Water 7 logistics",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "dockmaster",
+    "port",
+    "logistics",
+    "water7",
+    "express",
+    "mongodb",
+    "jwt"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.9.0",
+    "mongodb-memory-server": "^10.0.3"
+  }
+}
